@@ -17,7 +17,7 @@ def supported_platforms(host=None):
     if host == "darwin":
         return PLATFORMS
     if host == "win32":
-        return ("workbuddy", "doubao", "qoder-cn", "qwenwork", "qoder-global",
+        return ("workbuddy", "doubao", "qoder-cn", "qwenwork",
                 "trae-cn", "dumate", "miaoda", "kuku")
     if host.startswith("linux"):
         return ("workbuddy", "qwenwork")

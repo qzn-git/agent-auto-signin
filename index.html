@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 助手签到台 · 每日签到统计</title>
+  <script src="https://resource-static.cdn.bcebos.com/common/tailwindcss/3.4.16.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        container: { center: true, padding: '1.25rem', screens: { '2xl': '1200px' } },
+        extend: {
+          colors: {
+            border: 'hsl(var(--border))',
+            input: 'hsl(var(--input))',
+            ring: 'hsl(var(--ring))',
+            background: 'hsl(var(--background))',
+            foreground: 'hsl(var(--foreground))',
+            primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+            secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
+            muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+            accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
+            card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' }
+          },
+          borderRadius: {
+            lg: 'var(--radius)',
+            md: 'calc(var(--radius) - 2px)',
+            sm: 'calc(var(--radius) - 4px)'
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"PingFang SC"', '"Microsoft YaHei"', '"Helvetica Neue"', 'Arial', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* ===== FONT-FACE:BEGIN ===== */
+    /* 全部使用系统字体栈，零额外加载 */
+    /* ===== FONT-FACE:END ===== */
+
+    /* ===== DESIGN-TOKENS:BEGIN ===== */
+    :root {
+      --radius: 0.75rem;
+      --background: 220 30% 98%;
+      --foreground: 224 40% 12%;
+      --card: 0 0% 100%;
+      --card-foreground: 224 40% 12%;
+      --primary: 252 62% 45%;
+      --primary-foreground: 0 0% 100%;
+      --secondary: 220 22% 94%;
+      --secondary-foreground: 224 40% 22%;
+      --muted: 220 22% 94%;
+      --muted-foreground: 220 12% 38%;
+      --accent: 252 60% 95%;
+      --accent-foreground: 252 58% 34%;
+      --border: 220 18% 89%;
+      --input: 220 18% 87%;
+      --ring: 252 62% 45%;
+    }
+    /* ===== DESIGN-TOKENS:END ===== */
+
+    /* ===== APP-CSS:BEGIN ===== */
+    html { scroll-behavior: smooth; }
+    section[id] { scroll-margin-top: 4.5rem; }
+
+    /* 各助手的身份色（仅用于徽标 / 卡片点缀，不承担版面色） */
+    .a-doubao        { --h: 220; --s: 82%; }
+    .a-trae          { --h: 240; --s: 12%; }
+    .a-miaoda        { --h: 266; --s: 78%; }
+    .a-dazi          { --h: 198; --s: 88%; }
+    .a-kuku          { --h: 20;  --s: 85%; }
+    .a-qianwen       { --h: 288; --s: 70%; }
+    .a-qianwen-office{ --h: 170; --s: 60%; }
+    .a-qoder-cn       { --h: 210; --s: 75%; }
+    .a-qoder-global   { --h: 260; --s: 65%; }
+    .a-yuanbao       { --h: 145; --s: 64%; }
+    .a-wb            { --h: 42;  --s: 88%; }
+
+    .agent { background: hsl(var(--card)); border-color: hsl(var(--border)); }
+    .agent.is-checked {
+      border-color: hsl(var(--h) 40% 84%);
+      background: hsl(var(--h) 60% 98%);
+    }
+    .agent-badge {
+      background: hsl(var(--h) var(--s) 92%);
+      color: hsl(var(--h) 55% 28%);
+    }
+    .pill { font-size: 12px; line-height: 1.6; padding: 1px 8px; border-radius: 999px; font-weight: 500; white-space: nowrap; }
+    .pill-on { background: hsl(var(--h) var(--s) 91%); color: hsl(var(--h) 55% 26%); }
+    .pill-off { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+
+    .mini-days { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; }
+    .mini-day { height: 18px; border-radius: 3px; background: hsl(var(--muted)); }
+    .mini-day.on { background: hsl(var(--h) var(--s) 58%); }
+
+    .hero-dot {
+      display: grid; place-items: center; height: 36px; border-radius: 10px;
+      font-size: 13px; font-weight: 500; line-height: 1.2; padding: 0 4px;
+      text-align: center; overflow: hidden;
+      background: hsl(var(--muted)); color: hsl(var(--muted-foreground));
+      border: 1px solid transparent;
+    }
+    .hero-dot.on {
+      background: hsl(var(--h) var(--s) 92%);
+      color: hsl(var(--h) 55% 28%);
+      border-color: hsl(var(--h) 40% 86%);
+    }
+
+    .seg { background: hsl(var(--muted)); }
+    .seg-btn { color: hsl(var(--muted-foreground)); border-radius: calc(var(--radius) - 4px); }
+    .seg-btn.is-active { background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 1px 2px hsl(224 40% 12% / 0.08); }
+
+    .cal-cell {
+      position: relative; display: flex; flex-direction: column; justify-content: space-between;
+      aspect-ratio: 1 / 1; padding: 6px; border-radius: 10px; line-height: 1;
+      transition: transform .15s ease-out, box-shadow .15s ease-out;
+    }
+    .cal-cell:hover { transform: translateY(-1px); }
+    .cal-num { font-size: 13px; font-weight: 600; }
+    .cal-count { font-size: 12px; opacity: .85; align-self: flex-end; }
+    .lvl0 { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+    .lvl1 { background: hsl(252 60% 94%); color: hsl(252 45% 30%); }
+    .lvl2 { background: hsl(252 58% 86%); color: hsl(252 50% 24%); }
+    .lvl3 { background: hsl(252 58% 70%); color: hsl(252 60% 15%); }
+    .lvl4 { background: hsl(252 62% 45%); color: hsl(0 0% 100%); }
+    .cal-cell.is-future { opacity: .42; }
+    .cal-cell.is-today { box-shadow: inset 0 0 0 1.5px hsl(var(--primary)); }
+    .cal-cell.is-selected { outline: 2px solid hsl(var(--foreground)); outline-offset: 2px; }
+
+    .bar-wrap { height: 120px; display: flex; align-items: flex-end; }
+    .bar { width: 100%; border-radius: 4px 4px 2px 2px; transition: height .45s ease-out; }
+    .bar.has { background: hsl(var(--primary)); }
+    .bar.zero { background: hsl(var(--muted)); }
+    .bar.is-today { box-shadow: 0 0 0 2px hsl(var(--primary) / 0.22); }
+
+    .rank-bar { height: 6px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; }
+    .rank-fill { height: 100%; border-radius: 999px; background: hsl(var(--h) var(--s) 58%); }
+
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: hsl(var(--h) var(--s) 58%); }
+
+    .focal { animation: rise .45s ease-out both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+    /* ===== APP-CSS:END ===== */
+  </style>
+</head>
+<body class="bg-background text-foreground antialiased">
+
+  <header id="top" class="sticky top-0 z-30 border-b border-border bg-background">
+    <div class="container flex h-16 items-center justify-between gap-3">
+      <a href="#overview" class="flex items-center gap-2.5">
+        <span class="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        </span>
+        <span class="text-[15px] font-semibold tracking-tight">AI 助手签到台</span>
+      </a>
+      <nav class="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+        <a href="#overview" class="transition-colors hover:text-foreground">今日概览</a>
+        <a href="#checkin" class="transition-colors hover:text-foreground">签到面板</a>
+        <a href="#calendar" class="transition-colors hover:text-foreground">签到日历</a>
+        <a href="#stats" class="transition-colors hover:text-foreground">统计排行</a>
+      </nav>
+      <div class="flex items-center gap-2">
+        <span id="todayBadge" class="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground">--</span>
+        <a href="#checkin" class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">去签到</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="overview" class="py-12 md:py-16">
+      <div class="container">
+        <div class="grid items-center gap-10 md:grid-cols-[1.15fr_0.85fr]">
+          <div class="focal max-w-xl">
+            <p id="heroEyebrow" class="text-sm font-medium text-accent-foreground">--</p>
+            <h1 id="heroTitle" class="mt-3 text-[30px] font-semibold leading-[1.15] tracking-tight md:text-[42px]">正在读取签到记录</h1>
+            <p class="mt-4 max-w-prose text-sm leading-relaxed text-muted-foreground md:text-base">
+              记录豆包、Trae、秒哒、百度搭子、库库 AI、千问、千问办公、元宝与 workbuddy 每天是否已签到，随时查看连续天数、月度完成率与整月签到分布。数据只保存在当前浏览器本地。
+            </p>
+            <div class="mt-7 flex flex-wrap items-center gap-3">
+              <button id="btnSignAll" type="button" class="rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">一键全部签到</button>
+              <button id="btnOnlyOff" type="button" class="rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-card-foreground transition-colors hover:bg-secondary">只看未签到</button>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div class="flex items-center gap-5">
+              <div class="relative shrink-0">
+                <svg viewBox="0 0 120 120" class="h-28 w-28 -rotate-90 md:h-32 md:w-32" aria-hidden="true">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke-width="10" class="text-muted" stroke="currentColor"></circle>
+                  <circle id="ringProgress" cx="60" cy="60" r="52" fill="none" stroke-width="10" stroke-linecap="round" class="text-primary" stroke="currentColor" stroke-dasharray="326.7" stroke-dashoffset="326.7" style="transition: stroke-dashoffset .7s ease-out"></circle>
+                </svg>
+                <div class="absolute inset-0 grid place-items-center text-center">
+                  <div>
+                    <div id="ringValue" class="text-2xl font-semibold tabular-nums">--</div>
+                    <div class="text-xs text-muted-foreground">今日签到</div>
+                  </div>
+                </div>
+              </div>
+              <div class="min-w-0">
+                <p id="heroTitle" class="text-sm font-medium">正在读取…</p>
+                <p id="heroSummary" class="mt-1 text-sm leading-relaxed text-muted-foreground">--</p>
+                <p id="heroTip" class="mt-2 text-xs text-muted-foreground">连续签到会累计到「连续天数」。</p>
+              </div>
+            </div>
+            <div id="heroDots" class="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-3"></div>
+          </div>
+        </div>
+
+        <div class="mt-10 grid grid-cols-2 gap-3 md:mt-12 md:grid-cols-4">
+          <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-xs text-muted-foreground">今日已签到</p>
+            <p class="mt-2 text-2xl font-semibold tabular-nums"><span id="kpiToday">0</span><span class="text-sm font-normal text-muted-foreground"> / <span id="kpiTodayTotal">--</span></span></p>
+            <p id="kpiTodaySub" class="mt-1 text-xs text-muted-foreground">--</p>
+          </div>
+          <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-xs text-muted-foreground">本月完成率</p>
+            <p class="mt-2 text-2xl font-semibold tabular-nums"><span id="kpiRate">0</span><span class="text-sm font-normal text-muted-foreground"> %</span></p>
+            <p id="kpiRateSub" class="mt-1 text-xs text-muted-foreground">--</p>
+          </div>
+          <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-xs text-muted-foreground">最长连续</p>
+            <p class="mt-2 text-2xl font-semibold tabular-nums"><span id="kpiStreak">0</span><span class="text-sm font-normal text-muted-foreground"> 天</span></p>
+            <p id="kpiStreakSub" class="mt-1 text-xs text-muted-foreground">--</p>
+          </div>
+          <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-xs text-muted-foreground">累计签到</p>
+            <p class="mt-2 text-2xl font-semibold tabular-nums"><span id="kpiTotal">0</span><span class="text-sm font-normal text-muted-foreground"> 次</span></p>
+            <p id="kpiTotalSub" class="mt-1 text-xs text-muted-foreground">--</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="checkin" class="border-y border-border bg-muted py-12 md:py-16">
+      <div class="container">
+        <div class="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p class="text-sm font-medium text-accent-foreground">签到面板</p>
+            <h2 class="mt-2 text-[26px] font-semibold tracking-tight md:text-[32px]">今天签了谁，一眼看清</h2>
+          </div>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label class="relative block">
+              <span class="sr-only">搜索助手</span>
+              <input id="searchInput" type="search" placeholder="搜索助手名称" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary sm:w-48" />
+            </label>
+            <div class="seg inline-flex rounded-md p-1">
+              <button type="button" class="seg-btn px-3 py-1.5 text-sm is-active" data-filter="all">全部</button>
+              <button type="button" class="seg-btn px-3 py-1.5 text-sm" data-filter="off">未签到</button>
+              <button type="button" class="seg-btn px-3 py-1.5 text-sm" data-filter="on">已签到</button>
+            </div>
+          </div>
+        </div>
+        <div id="agentGrid" class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+      </div>
+    </section>
+
+    <section id="calendar" class="py-12 md:py-16">
+      <div class="container">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="text-sm font-medium text-accent-foreground">签到日历</p>
+            <h2 class="mt-2 text-[26px] font-semibold tracking-tight md:text-[32px]">整月签到密度</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="calPrev" type="button" class="grid h-9 w-9 place-items-center rounded-md border border-border bg-card text-card-foreground transition-colors hover:bg-secondary" aria-label="上一个月">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+            </button>
+            <span id="calTitle" class="min-w-[7.5rem] text-center text-sm font-medium tabular-nums">--</span>
+            <button id="calNext" type="button" class="grid h-9 w-9 place-items-center rounded-md border border-border bg-card text-card-foreground transition-colors hover:bg-secondary" aria-label="下一个月">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+            </button>
+            <button id="calToday" type="button" class="rounded-md border border-border bg-card px-3 py-2 text-xs text-card-foreground transition-colors hover:bg-secondary">回到今天</button>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-4 md:grid-cols-[1.45fr_1fr]">
+          <div class="rounded-lg border border-border bg-card p-4 md:p-5">
+            <div class="grid grid-cols-7 gap-1.5 pb-2 text-center text-xs text-muted-foreground">
+              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div id="calGrid" class="grid grid-cols-7 gap-1.5"></div>
+            <div class="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+              <span class="flex items-center gap-1.5">少 <span class="h-3 w-4 rounded-sm lvl0"></span><span class="h-3 w-4 rounded-sm lvl1"></span><span class="h-3 w-4 rounded-sm lvl2"></span><span class="h-3 w-4 rounded-sm lvl3"></span><span class="h-3 w-4 rounded-sm lvl4"></span> 多</span>
+              <span>颜色越深表示当天签到数量越多（0–9）</span>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-border bg-card p-4 md:p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p id="detailDate" class="text-sm font-medium">--</p>
+                <p id="detailSub" class="mt-1 text-xs text-muted-foreground">--</p>
+              </div>
+              <div id="detailActions" class="flex shrink-0 gap-2"></div>
+            </div>
+            <div id="detailBody" class="mt-4 space-y-4"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="stats" class="border-t border-border bg-muted py-12 md:py-16">
+      <div class="container">
+        <p class="text-sm font-medium text-accent-foreground">统计排行</p>
+        <h2 class="mt-2 text-[26px] font-semibold tracking-tight md:text-[32px]">最近 14 天与本月的节奏</h2>
+        <div class="mt-6 grid gap-4 md:grid-cols-2">
+          <div class="rounded-lg border border-border bg-card p-4 md:p-5">
+            <div class="flex items-center justify-between">
+              <p class="text-sm font-medium">最近 14 天签到数量</p>
+              <span id="barMaxLabel" class="text-xs text-muted-foreground">满格为 -- 个</span>
+            </div>
+            <div id="barChart" class="mt-5 flex items-end gap-1.5"></div>
+          </div>
+          <div class="rounded-lg border border-border bg-card p-4 md:p-5">
+            <div class="flex items-center justify-between">
+              <p class="text-sm font-medium">本月各助手签到次数</p>
+              <span id="rankSub" class="text-xs text-muted-foreground">--</span>
+            </div>
+            <div id="rankList" class="mt-4 space-y-3"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-border py-8">
+    <div class="container flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <p class="text-xs leading-relaxed text-muted-foreground">
+        数据保存在当前浏览器 localStorage 中，清除浏览器数据会同时清除签到记录。首次打开会生成一组示例记录，可随时重置。
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <button id="btnSeed" type="button" class="rounded-md border border-border bg-card px-3 py-2 text-xs text-card-foreground transition-colors hover:bg-secondary">重置为示例数据</button>
+        <button id="btnClear" type="button" class="rounded-md border border-border bg-card px-3 py-2 text-xs text-card-foreground transition-colors hover:bg-secondary">清空所有记录</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ===== APP-JS:BEGIN ===== -->
+  <script>
+    (function () {
+      'use strict';
+
+      // API 服务地址 —— 默认本地 Flask，可在浏览器控制台设置 localStorage.setItem('acApi', 'http://x.x.x.x:8765') 覆盖
+      var API_BASE = localStorage.getItem('acApi') || 'http://127.0.0.1:8765';
+
+      var AGENTS = [
+        { id: 'doubao', name: '豆包', short: '豆', cls: 'a-doubao', desc: '通用对话助手', type: 'desktop' },
+        { id: 'trae', name: 'Trae', short: 'T', cls: 'a-trae', desc: 'AI 编程工具', type: 'desktop' },
+        { id: 'miaoda', name: '秒哒', short: '秒', cls: 'a-miaoda', desc: '无代码应用生成', type: 'web' },
+        { id: 'dazi', name: '百度搭子', short: '搭', cls: 'a-dazi', desc: '智能体协作伙伴', type: 'desktop' },
+        { id: 'kuku', name: '库库AI', short: '库', cls: 'a-kuku', desc: 'AI 创作助手', type: 'web' },
+        { id: 'qianwen-office', name: '千问办公', short: '办', cls: 'a-qianwen-office', desc: '办公协作助手', type: 'web' },
+        { id: 'qoder-cn', name: 'Qoder 国内', short: 'Q', cls: 'a-qoder-cn', desc: 'AI 编程工具（国内版）', type: 'desktop' },
+        { id: 'workbuddy', name: 'workbuddy', short: 'W', cls: 'a-wb', desc: '办公效率助手', type: 'desktop' }
+      ];
+      var MAP = {};
+      AGENTS.forEach(function (a) { MAP[a.id] = a; });
+      var TOTAL = AGENTS.length;
+
+      var WEEK_FULL = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+      var WEEK_SHORT = ['日', '一', '二', '三', '四', '五', '六'];
+
+      var now = new Date();
+      var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var TODAY = dstr(today);
+
+      // 全局状态
+      var state = { days: {} };      // { '2026-11-18': ['doubao', 'trae', ...] }
+      var platformMeta = {};         // { 'doubao': {supported: true, name: '豆包'}, ... }
+      var todayStatus = {};          // { 'miaoda': 'NO_AUTH', 'kuku': 'NO_AUTH', ... }  ← 每个平台今日状态
+      var filter = 'all';
+      var term = '';
+      var selectedDate = TODAY;
+      var calYear = today.getFullYear();
+      var calMonth = today.getMonth();
+      var backendOnline = false;
+
+      var el = {
+        todayBadge: document.getElementById('todayBadge'),
+        heroEyebrow: document.getElementById('heroEyebrow'),
+        heroTitle: document.getElementById('heroTitle'),
+        heroSummary: document.getElementById('heroSummary'),
+        heroTip: document.getElementById('heroTip'),
+        heroDots: document.getElementById('heroDots'),
+        ring: document.getElementById('ringProgress'),
+        ringValue: document.getElementById('ringValue'),
+        kpiToday: document.getElementById('kpiToday'),
+        kpiTodaySub: document.getElementById('kpiTodaySub'),
+        kpiRate: document.getElementById('kpiRate'),
+        kpiRateSub: document.getElementById('kpiRateSub'),
+        kpiStreak: document.getElementById('kpiStreak'),
+        kpiStreakSub: document.getElementById('kpiStreakSub'),
+        kpiTotal: document.getElementById('kpiTotal'),
+        kpiTotalSub: document.getElementById('kpiTotalSub'),
+        agentGrid: document.getElementById('agentGrid'),
+        searchInput: document.getElementById('searchInput'),
+        calTitle: document.getElementById('calTitle'),
+        calGrid: document.getElementById('calGrid'),
+        detailDate: document.getElementById('detailDate'),
+        detailSub: document.getElementById('detailSub'),
+        detailBody: document.getElementById('detailBody'),
+        detailActions: document.getElementById('detailActions'),
+        barChart: document.getElementById('barChart'),
+        rankList: document.getElementById('rankList'),
+        rankSub: document.getElementById('rankSub')
+      };
+
+      /* ---------- 日期工具 ---------- */
+      function pad(n) { return String(n).padStart(2, '0'); }
+      function dstr(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+      function addDays(base, n) { return new Date(base.getFullYear(), base.getMonth(), base.getDate() + n); }
+      function parseDate(s) {
+        var p = s.split('-');
+        return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+      }
+
+      /* ---------- API 调用 ---------- */
+      async function apiGet(path) {
+        var res = await fetch(API_BASE + path, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      }
+      async function apiRun(platform) {
+        var url = API_BASE + '/api/run';
+        if (platform && platform !== 'all') url += '?platform=' + encodeURIComponent(platform);
+        var res = await fetch(url, { method: 'GET' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      }
+      async function apiLogin(platform) {
+        var res = await fetch(API_BASE + '/api/login?platform=' + encodeURIComponent(platform) + '&step=open', { method: 'GET' });
+        if (!res.ok) { var txt = await res.text(); throw new Error('HTTP ' + res.status + ': ' + txt); }
+        return res.json();
+      }
+      async function apiLoginStep(platform, step) {
+        var res = await fetch(API_BASE + '/api/login?platform=' + encodeURIComponent(platform) + '&step=' + encodeURIComponent(step), { method: 'GET' });
+        if (!res.ok) { var txt = await res.text(); throw new Error('HTTP ' + res.status + ': ' + txt); }
+        return res.json();
+      }
+
+      /* ---------- 初始化：拉取平台元信息 + 历史数据 ---------- */
+      async function initData() {
+        try {
+          // 1. 平台元信息（哪些后端支持）
+          var platResp = await apiGet('/api/platforms');
+          backendOnline = true;
+          platResp.platforms.forEach(function (p) {
+            platformMeta[p.frontend_id] = {
+              supported: p.supported,
+              backend_id: p.backend_id,
+              name: p.name
+            };
+          });
+
+          // 2. 历史签到（最近 60 天）
+          var histResp = await apiGet('/api/history?days=60');
+          state.days = histResp.days || {};
+
+          // 3. 今日实时状态（API 可能慢，忽略失败）
+          try {
+            var statResp = await apiGet('/api/status');
+            var todayList = [];
+            todayStatus = {};
+            statResp.platforms.forEach(function (p) {
+              if (p.frontend_id) {
+                todayStatus[p.frontend_id] = p.status;
+                if (p.status === 'CLAIMED' || p.status === 'ALREADY' || p.status === 'VISITED') {
+                  todayList.push(p.frontend_id);
+                }
+              }
+            });
+            if (todayList.length) state.days[TODAY] = todayList;
+          } catch (e) { /* 超时忽略，已有 history 兜底 */ }
+
+          // 同步 KPI 里的"总平台数"为后端实际支持数
+          var supportedCount = Object.values(platformMeta).filter(function (m) { return m.supported; }).length;
+          if (supportedCount > 0) TOTAL = supportedCount;
+
+        } catch (err) {
+          // 后端没连上，前端照样能看（可能是没启动 Flask）
+          backendOnline = false;
+          state.days = {};
+          console.warn('[签到台] 后端未连接 (' + err.message + ')，请先启动 server.py');
+          // 在页面上加个提示
+          var tip = document.createElement('div');
+          tip.style.cssText = 'position:fixed;top:60px;right:16px;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;padding:8px 14px;border-radius:6px;font-size:13px;z-index:99;';
+          tip.textContent = '⚠️ 后端未连接，请先运行 server.py（' + API_BASE + '）';
+          document.body.appendChild(tip);
+        }
+
+        renderAll();
+      }
+
+      /* ---------- 弃用：localStorage 已交给后端 ---------- */
+      function saveState() { /* no-op */ }
+      function seedData() { return { days: {} }; }
+
+      /* ---------- 数据读取 ---------- */
+      function checkedIds(dateKey) {
+        var list = state.days[dateKey];
+        return Array.isArray(list) ? list.filter(function (id) { return !!MAP[id]; }) : [];
+      }
+      function countOn(dateKey) { return checkedIds(dateKey).length; }
+      function hasCheck(agentId, dateKey) { return checkedIds(dateKey).indexOf(agentId) !== -1; }
+
+      function streakOf(agentId) {
+        var n = 0;
+        var cursor = hasCheck(agentId, TODAY) ? today : addDays(today, -1);
+        while (n < 4000 && hasCheck(agentId, dstr(cursor))) {
+          n++;
+          cursor = addDays(cursor, -1);
+        }
+        return n;
+      }
+
+      function monthCountOf(agentId) {
+        var n = 0;
+        for (var d = 1; d <= today.getDate(); d++) {
+          if (hasCheck(agentId, dstr(new Date(today.getFullYear(), today.getMonth(), d)))) n++;
+        }
+        return n;
+      }
+
+      function lastNDays(n) {
+        var out = [];
+        for (var i = n - 1; i >= 0; i--) {
+          var d = addDays(today, -i);
+          out.push({ date: d, key: dstr(d), count: countOn(dstr(d)) });
+        }
+        return out;
+      }
+
+      function computeStats() {
+        var signedToday = countOn(TODAY);
+        var elapsed = today.getDate();
+        var monthSigned = 0;
+        for (var d = 1; d <= elapsed; d++) {
+          monthSigned += countOn(dstr(new Date(today.getFullYear(), today.getMonth(), d)));
+        }
+        var rate = Math.round((monthSigned / (elapsed * TOTAL)) * 100);
+        var cumulative = 0;
+        Object.keys(state.days).forEach(function (k) { cumulative += checkedIds(k).length; });
+
+        var best = { id: null, n: 0 };
+        AGENTS.forEach(function (a) {
+          var s = streakOf(a.id);
+          if (s > best.n) best = { id: a.id, n: s };
+        });
+
+        return {
+          signedToday: signedToday,
+          elapsed: elapsed,
+          monthSigned: monthSigned,
+          rate: isNaN(rate) ? 0 : rate,
+          cumulative: cumulative,
+          best: best
+        };
+      }
+
+      /* ---------- 渲染 ---------- */
+      function renderHeader() {
+        el.todayBadge.textContent = (today.getMonth() + 1) + ' 月 ' + today.getDate() + ' 日 · ' + WEEK_FULL[today.getDay()];
+        el.heroEyebrow.textContent = today.getFullYear() + ' 年 ' + (today.getMonth() + 1) + ' 月 ' + today.getDate() + ' 日 · ' + WEEK_FULL[today.getDay()];
+      }
+
+      function renderOverview() {
+        var st = computeStats();
+        var rest = TOTAL - st.signedToday;
+
+        if (rest === 0) {
+          el.heroTitle.textContent = TOTAL + ' 个助手，今天全部签到了';
+          el.heroSummary.textContent = '今天已经全部签到，保持节奏，明天继续。';
+        } else if (st.signedToday === 0) {
+          el.heroTitle.textContent = '今天还没有签到记录';
+          el.heroSummary.textContent = '从下面挑一个开始，' + TOTAL + ' 个助手都在等你。';
+        } else {
+          el.heroTitle.textContent = '今天还有 ' + rest + ' 个助手没有签到';
+          el.heroSummary.textContent = '已完成 ' + st.signedToday + ' 个，还剩 ' + rest + ' 个待签到。';
+        }
+        // 动态填充 KPI 与柱状图的总数字段
+        var heroTitleEl = document.getElementById('heroTitle');
+        if (heroTitleEl && rest !== 0 && st.signedToday !== 0) {
+          heroTitleEl.textContent = TOTAL + ' 个助手的今日进度';
+        } else if (heroTitleEl && rest === 0) {
+          heroTitleEl.textContent = TOTAL + ' 个助手的今日进度';
+        } else if (heroTitleEl && st.signedToday === 0) {
+          heroTitleEl.textContent = TOTAL + ' 个助手的今日进度';
+        }
+        var kpiTodayTotalEl = document.getElementById('kpiTodayTotal');
+        if (kpiTodayTotalEl) kpiTodayTotalEl.textContent = TOTAL;
+        var barMaxLabelEl = document.getElementById('barMaxLabel');
+        if (barMaxLabelEl) barMaxLabelEl.textContent = '满格为 ' + TOTAL + ' 个';
+        el.heroTip.textContent = rest === 0 ? '今日完成率 100%，可以放心收工。' : '完成率 ' + Math.round((st.signedToday / TOTAL) * 100) + '%，点一下卡片即可签到。';
+
+        var c = 2 * Math.PI * 52;
+        el.ring.setAttribute('stroke-dasharray', c.toFixed(1));
+        el.ring.setAttribute('stroke-dashoffset', (c * (1 - st.signedToday / TOTAL)).toFixed(1));
+        el.ringValue.textContent = st.signedToday + '/' + TOTAL;
+
+        el.heroDots.innerHTML = AGENTS.map(function (a) {
+          var on = hasCheck(a.id, TODAY);
+          return '<div class="hero-dot ' + a.cls + (on ? ' on' : '') + '" title="' + a.name + (on ? '：今日已签到' : '：今日未签到') + '">' + a.name + '</div>';
+        }).join('');
+
+        el.kpiToday.textContent = String(st.signedToday);
+        el.kpiTodaySub.textContent = rest === 0 ? '今日已全部完成' : '还差 ' + rest + ' 个助手';
+        el.kpiRate.textContent = String(st.rate);
+        el.kpiRateSub.textContent = '本月已签 ' + st.monthSigned + ' 次 / ' + (st.elapsed * TOTAL) + ' 次';
+        el.kpiStreak.textContent = String(st.best.n);
+        el.kpiStreakSub.textContent = st.best.id ? MAP[st.best.id].name + ' 的连续记录' : '暂无连续记录';
+        el.kpiTotal.textContent = String(st.cumulative);
+        el.kpiTotalSub.textContent = '覆盖 ' + Object.keys(state.days).length + ' 天';
+      }
+
+      function renderAgents() {
+        var signedToday = checkedIds(TODAY);
+        var shown = AGENTS.filter(function (a) {
+          var on = signedToday.indexOf(a.id) !== -1;
+          if (filter === 'on' && !on) return false;
+          if (filter === 'off' && on) return false;
+          if (term && a.name.toLowerCase().indexOf(term.toLowerCase()) === -1) return false;
+          return true;
+        });
+
+        var segButtons = document.querySelectorAll('.seg-btn');
+        Array.prototype.forEach.call(segButtons, function (btn) {
+          var f = btn.getAttribute('data-filter');
+          btn.classList.toggle('is-active', f === filter);
+          var label = f === 'all' ? '全部' : f === 'off' ? '未签到' : '已签到';
+          var n = f === 'all' ? TOTAL : f === 'off' ? TOTAL - signedToday.length : signedToday.length;
+          btn.textContent = label + ' ' + n;
+        });
+
+        if (!shown.length) {
+          el.agentGrid.innerHTML = '<p class="col-span-full rounded-lg border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">没有符合条件的助手，换个筛选或搜索词试试。</p>';
+          return;
+        }
+
+        el.agentGrid.innerHTML = shown.map(function (a) {
+          var on = signedToday.indexOf(a.id) !== -1;
+          var supported = !platformMeta[a.id] || platformMeta[a.id].supported;
+          var streak = streakOf(a.id);
+          var mc = monthCountOf(a.id);
+          var minis = '';
+          for (var i = 13; i >= 0; i--) {
+            var d = addDays(today, -i);
+            var k = dstr(d);
+            var hit = hasCheck(a.id, k);
+            minis += '<span class="mini-day' + (hit ? ' on' : '') + '" title="' + (d.getMonth() + 1) + '月' + d.getDate() + '日' + (hit ? ' 已签到' : ' 未签到') + '"></span>';
+          }
+          var pillText = supported ? (on ? '已签到' : '未签到') : '未适配';
+          var pillCls = 'pill ' + (!supported ? '' : (on ? 'pill-on' : 'pill-off'));
+          var status = todayStatus[a.id];
+          var isWebPlatform = (a.type === 'web');
+          // 需要"引导登录"按钮：只有网页端
+          var needsLogin = isWebPlatform && (status === 'NO_AUTH' || status === 'BROWSER' || status === 'NETWORK' || status === 'DRY_RUN');
+          // 桌面端没装客户端的情况
+          var needsDesktopSetup = !isWebPlatform && (status === 'NO_AUTH' || status === 'BROWSER');
+          var btn;
+          if (!supported) {
+            btn = '<button type="button" disabled class="w-full cursor-not-allowed rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">后端未适配</button>';
+          } else if (needsLogin) {
+            pillText = (status === 'BROWSER' ? '浏览器异常' : status === 'NETWORK' ? '网络异常' : status === 'DRY_RUN' ? '签到入口未找到' : '待登录');
+            pillCls = 'pill';
+            btn = '<button type="button" data-action="login" data-id="' + a.id + '" class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90">🔐 重新引导登录</button>';
+          } else if (needsDesktopSetup) {
+            pillText = '待登录';
+            pillCls = 'pill';
+            btn = '<button type="button" disabled class="w-full cursor-not-allowed rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">⚠️ 请安装客户端登录</button>';
+          } else if (on) {
+            btn = '<button type="button" data-action="toggle" data-id="' + a.id + '" class="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-muted">今日已签到（重签）</button>';
+          } else {
+            btn = '<button type="button" data-action="toggle" data-id="' + a.id + '" class="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">立即签到</button>';
+          }
+          return '' +
+            '<article class="agent ' + a.cls + (on && supported ? ' is-checked' : '') + ' flex flex-col rounded-lg border p-4 shadow-sm">' +
+              '<div class="flex items-start gap-3">' +
+                '<div class="agent-badge grid h-10 w-10 shrink-0 place-items-center rounded-md text-base font-semibold">' + a.short + '</div>' +
+                '<div class="min-w-0 flex-1">' +
+                  '<h3 class="truncate text-base font-semibold">' + a.name + '</h3>' +
+                  '<p class="mt-0.5 truncate text-xs text-muted-foreground">' + a.desc + '</p>' +
+                '</div>' +
+                '<span class="' + pillCls + '">' + pillText + '</span>' +
+              '</div>' +
+              '<div class="mt-3 flex items-center justify-between text-xs text-muted-foreground">' +
+                '<span>连续 <b class="font-semibold tabular-nums text-foreground">' + streak + '</b> 天</span>' +
+                '<span>本月 <b class="font-semibold tabular-nums text-foreground">' + mc + '</b> 次</span>' +
+              '</div>' +
+              '<div class="mini-days mt-3">' + minis + '</div>' +
+              '<div class="mt-4">' + btn + '</div>' +
+            '</article>';
+        }).join('');
+      }
+
+      function renderCalendar() {
+        el.calTitle.textContent = calYear + ' 年 ' + (calMonth + 1) + ' 月';
+        var first = new Date(calYear, calMonth, 1);
+        var offset = (first.getDay() + 6) % 7;
+        var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+        var html = '';
+        for (var b = 0; b < offset; b++) html += '<div class="cal-blank" aria-hidden="true"></div>';
+        for (var d = 1; d <= daysInMonth; d++) {
+          var date = dstr(new Date(calYear, calMonth, d));
+          var c = countOn(date);
+          var lvl = c === 0 ? 0 : c <= 2 ? 1 : c <= 4 ? 2 : c <= 6 ? 3 : 4;
+          var cls = 'cal-cell lvl' + lvl;
+          if (date > TODAY) cls += ' is-future';
+          if (date === TODAY) cls += ' is-today';
+          if (date === selectedDate) cls += ' is-selected';
+          html += '<button type="button" class="' + cls + '" data-date="' + date + '" aria-label="' + (calMonth + 1) + '月' + d + '日，签到 ' + c + ' 个助手">' +
+                    '<span class="cal-num">' + d + '</span>' +
+                    (c ? '<span class="cal-count tabular-nums">' + c + '/<span class="cal-total">' + TOTAL + '</span></span>' : '<span class="cal-count"></span>') +
+                  '</button>';
+        }
+        el.calGrid.innerHTML = html;
+      }
+
+      function renderDetail() {
+        var d = parseDate(selectedDate);
+        var ids = checkedIds(selectedDate);
+        var miss = AGENTS.filter(function (a) { return ids.indexOf(a.id) === -1; });
+        var future = selectedDate > TODAY;
+
+        el.detailDate.textContent = d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 · ' + WEEK_FULL[d.getDay()];
+        el.detailSub.textContent = future ? '这一天还没到' : '已签到 ' + ids.length + ' / ' + TOTAL + ' 个助手';
+
+        if (future) {
+          el.detailActions.innerHTML = '';
+        } else {
+          var acts = '';
+          if (ids.length < TOTAL) {
+            acts += '<button type="button" data-action="fill-date" class="rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90">全部补签</button>';
+          }
+          if (ids.length > 0) {
+            acts += '<button type="button" data-action="clear-date" class="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary">清空这天</button>';
+          }
+          el.detailActions.innerHTML = acts;
+        }
+
+        var body = '';
+        if (!ids.length) {
+          body += '<p class="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">这一天没有签到记录' + (future ? '' : '，可用「全部补签」一次性补齐。') + '</p>';
+        } else {
+          body += '<div><p class="text-xs text-muted-foreground">已签到</p><ul class="mt-2 space-y-1.5">' +
+            ids.map(function (id) {
+              var a = MAP[id];
+              var localDate = selectedDate === TODAY ? TODAY : selectedDate;
+              var streak = localDate === TODAY ? streakOf(id) : 0;
+              return '<li class="flex items-center justify-between rounded-md border border-border px-3 py-2">' +
+                '<span class="flex items-center gap-2 text-sm"><span class="dot ' + a.cls + '"></span>' + a.name + '</span>' +
+                '<span class="text-xs text-muted-foreground">' + (streak ? '连续 ' + streak + ' 天' : a.desc) + '</span>' +
+              '</li>';
+            }).join('') + '</ul></div>';
+        }
+        if (miss.length && !future) {
+          body += '<div><p class="text-xs text-muted-foreground">未签到（' + miss.length + '）</p><div class="mt-2 flex flex-wrap gap-1.5">' +
+            miss.map(function (a) {
+              return '<span class="pill pill-off">' + a.name + '</span>';
+            }).join('') + '</div></div>';
+        }
+        el.detailBody.innerHTML = body;
+      }
+
+      function renderBars() {
+        var data = lastNDays(14);
+        el.barChart.innerHTML = data.map(function (item) {
+          var pct = Math.round((item.count / TOTAL) * 100);
+          var cls = 'bar ' + (item.count ? 'has' : 'zero') + (item.key === TODAY ? ' is-today' : '');
+          return '<div class="flex flex-1 flex-col items-center justify-end gap-1.5" title="' + (item.date.getMonth() + 1) + '月' + item.date.getDate() + '日：' + item.count + ' 个助手">' +
+                    '<span class="text-xs font-medium tabular-nums">' + item.count + '</span>' +
+                    '<div class="bar-wrap w-full">' +
+                      '<div class="' + cls + '" style="height:' + Math.max(pct, 3) + '%"></div>' +
+                    '</div>' +
+                    '<span class="text-xs text-muted-foreground">' + WEEK_SHORT[item.date.getDay()] + '</span>' +
+                  '</div>';
+        }).join('');
+      }
+
+      function renderRank() {
+        var rows = AGENTS.map(function (a) { return { a: a, n: monthCountOf(a.id) }; });
+        rows.sort(function (x, y) { return y.n - x.n || x.a.name.localeCompare(y.a.name); });
+        var max = Math.max(today.getDate(), 1);
+        el.rankSub.textContent = '已过 ' + today.getDate() + ' 天';
+        el.rankList.innerHTML = rows.map(function (r) {
+          var pct = Math.round((r.n / max) * 100);
+          return '<div class="flex items-center gap-3">' +
+                   '<span class="agent-badge ' + r.a.cls + ' grid h-7 w-7 shrink-0 place-items-center rounded-md text-xs font-semibold">' + r.a.short + '</span>' +
+                   '<div class="min-w-0 flex-1">' +
+                     '<div class="flex items-center justify-between gap-2 text-xs">' +
+                       '<span class="truncate font-medium">' + r.a.name + '</span>' +
+                       '<span class="shrink-0 tabular-nums text-muted-foreground">' + r.n + ' 次</span>' +
+                     '</div>' +
+                     '<div class="rank-bar ' + r.a.cls + ' mt-1.5"><div class="rank-fill" style="width:' + pct + '%"></div></div>' +
+                   '</div>' +
+                 '</div>';
+        }).join('');
+      }
+
+      function renderAll() {
+        renderHeader();
+        renderOverview();
+        renderAgents();
+        renderCalendar();
+        renderDetail();
+        renderBars();
+        renderRank();
+      }
+
+      /* ---------- 交互（调后端真实签到） ---------- */
+      function toggleAgent(id) {
+        var meta = platformMeta[id];
+        if (!meta || !meta.supported) {
+          alert('「' + MAP[id].name + '」后端尚未适配，无法触发签到。');
+          return;
+        }
+        signOne(id);
+      }
+
+      async function signOne(frontendId) {
+        var btn = document.querySelector('[data-action="toggle"][data-id="' + frontendId + '"]');
+        if (btn) { btn.disabled = true; btn.textContent = '签到中…'; }
+        try {
+          var resp = await apiRun(frontendId);
+          // 把结果合并进 state.days[TODAY]
+          var list = (state.days[TODAY] || []).slice();
+          var platform = resp.platforms && resp.platforms[0];
+          if (platform) {
+            if (platform.status === 'CLAIMED' || platform.status === 'ALREADY' || platform.status === 'VISITED') {
+              if (list.indexOf(frontendId) === -1) list.push(frontendId);
+            }
+            if (platform.status === 'NO_AUTH' || platform.status === 'ERROR') {
+              alert('「' + MAP[frontendId].name + '」签到失败：' + (platform.report || platform.status));
+            }
+          }
+          state.days[TODAY] = list;
+          renderAll();
+        } catch (err) {
+          alert('请求失败：' + err.message + '\n请确认后端 server.py 是否启动。');
+          if (btn) { btn.disabled = false; btn.textContent = '立即签到'; }
+        }
+      }
+
+      async function signTodayAll() {
+        var btn = document.getElementById('btnSignAll');
+        if (btn) { btn.disabled = true; btn.textContent = '签到中…'; }
+        try {
+          var resp = await apiRun('all');
+          var list = [];
+          (resp.platforms || []).forEach(function (p) {
+            if ((p.status === 'CLAIMED' || p.status === 'ALREADY' || p.status === 'VISITED') && p.frontend_id) {
+              list.push(p.frontend_id);
+            }
+          });
+          state.days[TODAY] = list;
+          renderAll();
+        } catch (err) {
+          alert('一键签到失败：' + err.message);
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = '一键全部签到'; }
+        }
+      }
+
+      document.getElementById('btnSignAll').addEventListener('click', signTodayAll);
+      document.getElementById('btnOnlyOff').addEventListener('click', function () {
+        filter = 'off';
+        renderAgents();
+        document.getElementById('checkin').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+
+      el.agentGrid.addEventListener('click', function (e) {
+        var loginBtn = e.target.closest('[data-action="login"]');
+        if (loginBtn) { doLogin(loginBtn.getAttribute('data-id')); return; }
+        var btn = e.target.closest('[data-action="toggle"]');
+        if (btn) toggleAgent(btn.getAttribute('data-id'));
+      });
+
+      async function doLogin(frontendId) {
+        var btn = document.querySelector('[data-action="login"][data-id="' + frontendId + '"]');
+        if (btn) { btn.disabled = true; btn.textContent = '正在打开浏览器...'; }
+        try {
+          // Step 1: 打开系统浏览器新标签页
+          var openResp = await apiLoginStep(frontendId, 'open');
+          if (openResp.result !== 'OK') {
+            alert('❌ 打开浏览器失败：' + (openResp.error || openResp.report));
+            if (btn) { btn.disabled = false; btn.textContent = '🔐 重新引导登录'; }
+            return;
+          }
+
+          // Step 2: 弹窗让用户完成登录 + 关浏览器 + 点确认
+          var confirmed = confirm(
+            '✅ 已在你的浏览器打开「' + MAP[frontendId].name + '」登录页\n\n' +
+            '👉 请在浏览器中完成登录\n' +
+            '👉 登录后请【关闭所有 Edge/Chrome 浏览器窗口】\n' +
+            '👉 关闭后点【确定】继续\n\n' +
+            '点【取消】可稍后再试'
+          );
+          if (!confirmed) {
+            if (btn) { btn.disabled = false; btn.textContent = '🔐 重新引导登录'; }
+            return;
+          }
+
+          // Step 3: confirm 步骤 - 复制 Cookie + 验证
+          if (btn) { btn.textContent = '复制 Cookie 中...'; }
+          var confirmResp = await apiLoginStep(frontendId, 'confirm');
+
+          if (confirmResp.result === 'OK') {
+            var afterMsg = confirmResp.after_login_result ? ('\n\n' + (confirmResp.after_login_result.report || '')) : '';
+            alert('✅ 「' + MAP[frontendId].name + '」登录成功！' + afterMsg);
+            // 刷新今日状态
+            try {
+              var statResp = await apiGet('/api/status');
+              todayStatus = {};
+              var todayList = [];
+              statResp.platforms.forEach(function (p) {
+                if (p.frontend_id) {
+                  todayStatus[p.frontend_id] = p.status;
+                  if (p.status === 'CLAIMED' || p.status === 'ALREADY' || p.status === 'VISITED') {
+                    todayList.push(p.frontend_id);
+                  }
+                }
+              });
+              state.days[TODAY] = todayList;
+            } catch (e) { /* ignore */ }
+            renderAll();
+          } else {
+            alert('❌ 登录态验证失败：' + (confirmResp.report || '请确认已关闭所有浏览器窗口'));
+            if (btn) { btn.disabled = false; btn.textContent = '🔐 重新引导登录'; }
+          }
+        } catch (err) {
+          alert('❌ 请求失败：' + err.message + '\n\n请确认后端 server.py 正在运行。');
+          if (btn) { btn.disabled = false; btn.textContent = '🔐 重新引导登录'; }
+        }
+      }
+
+      document.querySelectorAll('.seg-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          filter = btn.getAttribute('data-filter');
+          renderAgents();
+        });
+      });
+
+      el.searchInput.addEventListener('input', function (e) {
+        term = e.target.value.trim();
+        renderAgents();
+      });
+
+      el.calGrid.addEventListener('click', function (e) {
+        var cell = e.target.closest('[data-date]');
+        if (!cell) return;
+        selectedDate = cell.getAttribute('data-date');
+        renderCalendar();
+        renderDetail();
+      });
+
+      el.detailActions.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        var action = btn.getAttribute('data-action');
+        if (action === 'fill-date') {
+          state.days[selectedDate] = AGENTS.map(function (a) { return a.id; });
+        } else if (action === 'clear-date') {
+          delete state.days[selectedDate];
+        }
+        saveState();
+        renderAll();
+      });
+
+      document.getElementById('calPrev').addEventListener('click', function () {
+        calMonth--;
+        if (calMonth < 0) { calMonth = 11; calYear--; }
+        renderCalendar();
+      });
+      document.getElementById('calNext').addEventListener('click', function () {
+        calMonth++;
+        if (calMonth > 11) { calMonth = 0; calYear++; }
+        renderCalendar();
+      });
+      document.getElementById('calToday').addEventListener('click', function () {
+        calYear = today.getFullYear();
+        calMonth = today.getMonth();
+        selectedDate = TODAY;
+        renderCalendar();
+        renderDetail();
+      });
+
+      document.getElementById('btnSeed').addEventListener('click', function () {
+        alert('已接入后端 API，不再使用示例数据。请到浏览器控制台访问后端接口。');
+      });
+
+      document.getElementById('btnClear').addEventListener('click', function () {
+        alert('已接入后端 API，历史记录由后端日志维护，无法在前端清空。');
+      });
+
+      // 启动：异步拉取后端数据
+      initData();
+    })();
+  </script>
+  <!-- ===== APP-JS:END ===== -->
+</body>
+</html>
