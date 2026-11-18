@@ -8,7 +8,8 @@ import sys
 
 
 PLATFORMS = ("workbuddy", "doubao", "qoder-cn", "dumate", "qwenwork",
-             "wps-lingxi", "trae-cn", "qoder-global", "workbuddy-global")
+             "wps-lingxi", "trae-cn", "qoder-global", "workbuddy-global",
+             "miaoda", "kuku")
 
 
 def supported_platforms(host=None):
@@ -16,7 +17,8 @@ def supported_platforms(host=None):
     if host == "darwin":
         return PLATFORMS
     if host == "win32":
-        return ("workbuddy", "doubao", "qoder-cn", "qwenwork", "qoder-global")
+        return ("workbuddy", "doubao", "qoder-cn", "qwenwork", "qoder-global",
+                "trae-cn", "dumate", "miaoda", "kuku")
     if host.startswith("linux"):
         return ("workbuddy", "qwenwork")
     return ()
@@ -74,6 +76,12 @@ def _invoke(platform, action):
                                    "当天需在国际版客户端发起至少一条对话，奖励次日发放")
         else:
             code, result = outcome("NOT_INSTALLED", "未找到 WorkBuddy 国际版客户端", 2)
+    elif platform == "miaoda":
+        import miaoda_signin
+        code, result = miaoda_signin.run(action)
+    elif platform == "kuku":
+        import kuku_signin
+        code, result = kuku_signin.run(action)
     else:
         code, result = outcome("UNSUPPORTED", "此平台尚未适配当前系统", 2)
     print(json.dumps(result, ensure_ascii=False))
@@ -85,11 +93,23 @@ def _run_one(platform, action):
     try:
         with redirect_stdout(captured):
             code = _invoke(platform, action)
-        result = json.loads(captured.getvalue())
+        output = captured.getvalue()
+        json_line = None
+        for line in reversed(output.strip().splitlines()):
+            stripped = line.strip()
+            if stripped.startswith("{") and stripped.endswith("}"):
+                json_line = stripped
+                break
+        if json_line is None:
+            raise ValueError(f"找不到 JSON 行。原始 output 长度={len(output)}，最后200字符：{output[-200:]!r}")
+        result = json.loads(json_line)
         if not isinstance(result, dict) or not isinstance(result.get("result"), str):
-            raise ValueError("missing result")
+            raise ValueError(f"result 字段缺失。解析到：{json_line[:100]}")
     except Exception as exc:
-        code, result = 2, {"result": "ERROR", "report": f"运行失败（{type(exc).__name__}）"}
+        import traceback
+        tb = traceback.format_exc()
+        result = {"result": "ERROR", "report": f"运行失败（{type(exc).__name__}）：{exc}\n{tb}"}
+        code = 2
 
     return code, {
         "platform": platform,

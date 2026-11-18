@@ -61,6 +61,9 @@ def _data_dir():
     override = os.environ.get("TRAE_CN_DATA_DIR")
     if override:
         return Path(override).expanduser()
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        return Path(appdata) / "Trae CN"
     return Path.home() / "Library/Application Support" / APP_NAME
 
 

@@ -9,6 +9,7 @@ import tempfile
 import traceback
 
 from agent_signin import PLATFORMS, _run_one, supported_platforms
+from notify import send as send_notification, channel as notify_channel
 from platform_paths import log_dir, state_dir
 
 QODER_PLATFORMS = ("qoder-cn", "qoder-global")
@@ -78,6 +79,79 @@ def run(group, now=None, path=None, runner=_run_one, hour=9, minute=30):
     return exit_code
 
 
+class _Collector:
+    """写日志的同时收下 JSON 行，供推送汇总使用。"""
+
+    def __init__(self, handle, sink):
+        self._handle = handle
+        self._sink = sink
+
+    def write(self, text):
+        self._handle.write(text)
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(payload, dict) and "platform" in payload and "result" in payload:
+                self._sink.append(payload)
+        return len(text)
+
+    def flush(self):
+        self._handle.flush()
+
+
+def summary_title(results):
+    cycle = next((item.get("cycle_utc8") for item in results if item.get("cycle_utc8")), "")
+    return "签到结果 {0}".format(cycle) if cycle else "签到结果"
+
+
+STATUS_TEXT = {
+    "CLAIMED": "已领取",
+    "ALREADY": "今日已签",
+    "DRY_RUN": "今日可领",
+    "NO_AUTH": "未登录",
+    "NOT_INSTALLED": "未安装",
+    "BROWSER": "浏览器不可用",
+    "VISITED": "已访问工作区",
+    "ACTIVITY_REQUIRED": "需当天发起对话",
+    "ERROR": "运行失败",
+}
+
+
+def summary_text(results, now=None):
+    now = (now or datetime.now(timezone.utc)).astimezone(REWARD_TZ)
+    lines = ["北京时间 {0:%Y-%m-%d %H:%M}".format(now)]
+    for item in results:
+        flag = "待处理" if item.get("needs_attention") else "完成"
+        report = str(item.get("report") or "").strip()
+        status = str(item.get("result") or "")
+        lines.append(
+            "【{0}】{1}：{2}（{3}）".format(
+                flag, item.get("platform"), STATUS_TEXT.get(status, status), report
+            )
+        )
+    return chr(10).join(lines)
+
+
+def _notify_once(logs, results):
+    """每个周期只推一条汇总；推送失败只写日志，不影响签到退出码。"""
+    if not results or not notify_channel():
+        return
+    try:
+        ok, detail = send_notification(summary_title(results), summary_text(results))
+    except Exception:
+        with (logs / "notify.err").open("a", encoding="utf-8") as errors:
+            traceback.print_exc(file=errors)
+        return
+    if not ok:
+        with (logs / "notify.err").open("a", encoding="utf-8") as errors:
+            errors.write("push failed: {0}".format(detail) + chr(10))
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="按北京时间执行本机每日任务")
     parser.add_argument("group", choices=("daily", "qoder", "all"))
@@ -93,15 +167,17 @@ def main(argv=None):
     logs = log_dir()
     logs.mkdir(parents=True, exist_ok=True, mode=0o700)
     codes = []
+    results = []
     for group in groups:
         with (logs / f"{group}.jsonl").open("a", encoding="utf-8") as output, \
              (logs / f"{group}.err").open("a", encoding="utf-8") as errors, \
-             redirect_stdout(output), redirect_stderr(errors):
+             redirect_stdout(_Collector(output, results)), redirect_stderr(errors):
             try:
                 codes.append(run(group, hour=args.hour, minute=args.minute))
             except Exception:
                 traceback.print_exc(file=errors)
                 codes.append(2)
+    _notify_once(logs, results)
     return max(codes)
 
 
