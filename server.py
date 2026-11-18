@@ -10,7 +10,7 @@ import signal
 import threading
 import subprocess
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -22,6 +22,9 @@ _status_cache = {"date": None, "platforms": None}
 
 # 多线程串行化锁（Playwright + redirect_stdout 在多线程下不是线程安全的）
 _invoke_lock = threading.Lock()
+
+# daily.jsonl 写入锁（避免多个签到同时写文件冲突）
+_log_lock = threading.Lock()
 
 # Windows 下允许前端跨域（前端是独立打开的 HTML 文件）
 # Flask 3.x 内置了简单 CORS
@@ -122,6 +125,10 @@ def api_status():
                           "report": f"异常 {type(exc).__name__}"}
                 code = 1
         fe_id = BACKEND_TO_FRONTEND.get(platform)
+
+        # 官方状态同步回 daily.jsonl：检测到已签到但日志没有时补写
+        _maybe_sync_status_to_log(platform, result, today)
+
         return {
             "frontend_id": fe_id,
             "backend_id": platform,
@@ -161,6 +168,71 @@ def _invalidate_status_cache():
     _status_cache = {"date": None, "platforms": None}
 
 
+def _append_daily_log(platform, result_dict):
+    """把签到结果追写到 daily.jsonl（与 scheduled_run.py 格式一致）。
+
+    手动在前端签到 /api/run 时也要写日志，不然 history 看不到。
+    """
+    bj = timezone(timedelta(hours=8))
+    cycle = datetime.now(bj).strftime("%Y-%m-%d")
+    line = json.dumps({
+        "cycle_utc8": cycle,
+        "platform": platform,
+        "result": result_dict.get("result", ""),
+        "report": result_dict.get("report", ""),
+        "needs_attention": result_dict.get("needs_attention", False),
+    }, ensure_ascii=False)
+
+    try:
+        from platform_paths import log_dir as _log_dir
+        daily_log = _log_dir() / "daily.jsonl"
+        daily_log.parent.mkdir(parents=True, exist_ok=True)
+        with _log_lock:
+            with daily_log.open("a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+    except Exception:
+        pass  # 日志写失败不影响签到主流程
+
+
+def _maybe_sync_status_to_log(platform, result_dict, cycle):
+    """status 检测到已签到但 daily.jsonl 没有这条记录时，自动补写。
+
+    这让 history 反映真实状态（官方 API 返回），而不是只记录"我跑过"的动作。
+    不管你在哪签到（本地 Flask、手机 APP、官方网页），下次 status 都会同步进来。
+    """
+    status = result_dict.get("result", "")
+    if status not in ("CLAIMED", "ALREADY", "VISITED"):
+        return  # 未签到 / 失败的不用写
+
+    try:
+        from platform_paths import log_dir as _log_dir
+        daily_log = _log_dir() / "daily.jsonl"
+        if not daily_log.is_file():
+            # 日志文件不存在，直接写
+            _append_daily_log(platform, result_dict)
+            return
+
+        # 扫描今天有没有这个平台的记录，避免重复
+        with _log_lock:
+            with daily_log.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except ValueError:
+                        continue
+                    if (obj.get("cycle_utc8") == cycle
+                            and obj.get("platform") == platform):
+                        return  # 已有，不重复
+
+        # 补写（去重确认过了，安全）
+        _append_daily_log(platform, result_dict)
+    except Exception:
+        pass  # 同步失败不影响 status 返回值
+
+
 @app.route("/api/run", methods=["GET", "POST"])
 def api_run():
     """触发签到。GET 参数或 POST body: ?platform=xxx 或 {"platform": "all"}。"""
@@ -197,6 +269,8 @@ def api_run():
             "report": result.get("report", ""),
             "code": code,
         })
+        # 写 daily.jsonl，让 history API 能看到手动签到的记录
+        _append_daily_log(p, result)
 
     # 签到完清缓存，下次 status 自动刷新
     _invalidate_status_cache()
@@ -332,6 +406,71 @@ def api_history():
         d = (today - timedelta(days=i)).isoformat()
         out[d] = history.get(d, [])
     return jsonify({"days": out, "backend_log_found": bool(history)})
+
+
+@app.route("/api/sync-history", methods=["POST", "GET"])
+def api_sync_history():
+    """强制扫描全平台今日签到状态，同步补写到 daily.jsonl。
+
+    场景：用户在官方 APP / 网页签了到，但 Flask status 缓存还没刷新，
+    手动点一下"同步"就能把官方真实状态同步进历史记录。
+    """
+    _invalidate_status_cache()
+
+    bj = timezone(timedelta(hours=8))
+    cycle = datetime.now(bj).strftime("%Y-%m-%d")
+    win_platforms = supported_platforms("win32")
+
+    synced = []
+    skipped = []
+    errors = []
+
+    for platform in win_platforms:
+        with _invoke_lock:
+            try:
+                code, result = _run_one(platform, "status")
+            except Exception as exc:
+                errors.append({"platform": platform, "error": str(exc)})
+                continue
+
+        status = result.get("result", "")
+        fe_id = BACKEND_TO_FRONTEND.get(platform)
+
+        if status in ("CLAIMED", "ALREADY", "VISITED"):
+            # 检查 daily.jsonl 今天有没有，没有才补写
+            from platform_paths import log_dir as _log_dir
+            daily_log = _log_dir() / "daily.jsonl"
+            already = False
+            if daily_log.is_file():
+                with _log_lock:
+                    with daily_log.open("r", encoding="utf-8") as fh:
+                        for line in fh:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                obj = json.loads(line)
+                            except ValueError:
+                                continue
+                            if (obj.get("cycle_utc8") == cycle
+                                    and obj.get("platform") == platform):
+                                already = True
+                                break
+
+            if already:
+                skipped.append({"platform": fe_id or platform, "reason": "已有记录"})
+            else:
+                _append_daily_log(platform, result)
+                synced.append({"platform": fe_id or platform,
+                               "status": status,
+                               "report": result.get("report", "")})
+        else:
+            skipped.append({"platform": fe_id or platform,
+                            "reason": f"status={status}"})
+
+    return jsonify({"date": cycle, "synced": synced,
+                    "skipped": skipped, "errors": errors,
+                    "synced_count": len(synced)})
 
 
 # ---------- 前端静态文件 ----------

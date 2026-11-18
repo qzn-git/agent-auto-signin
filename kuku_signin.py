@@ -243,6 +243,11 @@ def run(action):
                 if text in body_text:
                     return _result("ALREADY", "库库AI今天已签到")
 
+            # status 模式：只检测状态，不改页面
+            if action == "status":
+                return _result("DRY_RUN", "库库AI首页已加载，签到状态需人工确认")
+
+            # run 模式：尝试点击签到按钮
             clickable_keywords = ["签到", "领取", "积分", "每日签到", "立即领取"]
             clicked = False
             for kw in clickable_keywords:
