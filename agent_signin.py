@@ -7,7 +7,7 @@ import json
 import sys
 
 
-PLATFORMS = ("workbuddy", "doubao", "qoder-cn", "dumate", "qwenwork",
+PLATFORMS = ("workbuddy", "doubao", "qoder-cn", "dumate",
              "wps-lingxi", "trae-cn", "qoder-global", "workbuddy-global",
              "miaoda", "kuku")
 
@@ -17,10 +17,10 @@ def supported_platforms(host=None):
     if host == "darwin":
         return PLATFORMS
     if host == "win32":
-        return ("workbuddy", "doubao", "qoder-cn", "qwenwork",
+        return ("workbuddy", "doubao", "qoder-cn",
                 "trae-cn", "dumate", "miaoda", "kuku")
     if host.startswith("linux"):
-        return ("workbuddy", "qwenwork")
+        return ("workbuddy",)
     return ()
 
 

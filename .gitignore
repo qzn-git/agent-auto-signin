@@ -6,3 +6,14 @@ node_modules/
 __pycache__/
 .venv/
 *.log
+*.err
+# debug scratch files
+_check_*.py
+_debug_*.py
+_debug_*.png
+_diag_*.py
+_login_*.py
+_open_*.py
+# runtime data
+daily.jsonl
+daily.jsonl.*

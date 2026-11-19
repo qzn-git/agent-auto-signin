@@ -71,11 +71,11 @@ def _kill_stale_browser_exes():
                 pass
 
 
-BASE_URL = "https://kukuai.cn"
+BASE_URL = "https://kuku.baidu.com"
 CHECKIN_URL = BASE_URL + "/"
 
-SUCCESS_TEXT = {"签到成功", "领取成功", "已领取", "获得积分"}
-ALREADY_TEXT = {"已签到", "今日已签到", "明日再来", "已领取过", "已完成"}
+SUCCESS_TEXT = {"签到成功", "领取成功", "已领取", "获得积分", "今日已签"}
+ALREADY_TEXT = {"已签到", "今日已签到", "今日已签", "明日再来", "已领取过", "已完成", "连签", "已签"}
 
 
 def _result(status, report, code=0):
@@ -110,17 +110,18 @@ def login_interactive(step="open"):
         print("[库库AI] 检查浏览器是否已关闭...")
         user_exe = _find_system_browser()
         user_exe_name = os.path.basename(user_exe) if user_exe else "msedge.exe"
-        result = subprocess.run(
-            ["wmic", "process", "where", f"name='{user_exe_name}'", "get", "processid"],
-            capture_output=True, text=True, timeout=5,
-        )
-        has_running_browser = any(line.strip().isdigit()
-                                  for line in result.stdout.strip().split("\n")[1:])
-        if has_running_browser:
-            print(f"[库库AI] ❌ 检测到 {user_exe_name} 还在运行！请先关闭。")
-            return False
 
-        print("[库库AI] ✅ 浏览器已关闭，复制 Cookie...")
+        # 先强制 kill 所有 Edge/Chrome 进程（包括开机自启的后台进程）
+        # 不 kill 掉的话 Cookie 文件会被锁，只能复制到部分 Cookie
+        print(f"[库库AI] 清理 {user_exe_name} 进程以解锁 Cookie 文件...")
+        subprocess.run(
+            ["taskkill", "/F", "/IM", user_exe_name, "/T"],
+            capture_output=True, timeout=10,
+        )
+        import time
+        time.sleep(1)  # 等进程完全退出释放文件锁
+
+        print("[库库AI] ✅ Cookie 文件已解锁，开始复制...")
         _kill_stale_browser_exes()
 
         src = _find_user_browser_profile()
@@ -194,17 +195,19 @@ def login_interactive(step="open"):
 
 
 def _new_context(playwright, headless=True):
+    """创建 Playwright 持久化上下文。
+
+    注意：不指定 executable_path，使用 Playwright 自带的 Chromium。
+    用系统 Edge + Playwright profile 会导致 Cookie 读取异常（Edge 安全机制）。
+    """
     _kill_stale_browser_exes()
-    exe = _find_system_browser()
     kwargs = dict(
         user_data_dir=str(PROFILE_DIR),
         headless=headless,
         locale="zh-CN",
     )
-    if exe:
-        kwargs["executable_path"] = exe
-        if headless:
-            kwargs["args"] = ["--headless=new", "--disable-gpu"]
+    if headless:
+        kwargs["args"] = ["--headless=new", "--disable-gpu"]
     return playwright.chromium.launch_persistent_context(**kwargs)
 
 
@@ -221,11 +224,14 @@ def run(action):
     if not _has_cookie():
         return _result("NO_AUTH", "库库AI还没有登录态，请先引导登录", 2)
 
+    # status 模式静默后台跑，run 模式才显示浏览器
+    is_status = (action == "status")
+
     with sync_playwright() as pw:
         try:
-            browser = _new_context(pw, headless=True)
+            browser = _new_context(pw, headless=is_status)
         except Error:
-            return _result("BROWSER", "无法启动浏览器，请确认已关闭所有 Edge/Chrome 窗口", 2)
+            return _result("BROWSER", "无法启动浏览器", 2)
 
         try:
             page = browser.new_page()
@@ -236,48 +242,116 @@ def run(action):
             page.wait_for_timeout(3000)
             body_text = page.locator("body").inner_text(timeout=5000)
 
+            # 登录态检查
             if any(k in body_text for k in ["扫码登录", "手机号登录"]):
                 return _result("NO_AUTH", "库库AI登录态失效，请重新引导登录", 2)
 
+            # 首页文本里直接有"已签到"类文字 → 今天已签
             for text in ALREADY_TEXT:
                 if text in body_text:
                     return _result("ALREADY", "库库AI今天已签到")
 
-            # status 模式：只检测状态，不改页面
-            if action == "status":
-                return _result("DRY_RUN", "库库AI首页已加载，签到状态需人工确认")
+            # ======== status/run 都往下走：点左侧签到按钮，进 iframe 检测 is-signed ========
+            # （status 模式不再 early return，改为点按钮看弹窗状态）
 
-            # run 模式：尝试点击签到按钮
-            clickable_keywords = ["签到", "领取", "积分", "每日签到", "立即领取"]
-            clicked = False
-            for kw in clickable_keywords:
-                buttons = page.get_by_text(kw, exact=False).all()
-                for btn in buttons:
-                    try:
-                        if btn.is_visible() and btn.is_enabled() and kw != "登录":
-                            btn.click(timeout=3000)
-                            clicked = True
-                            page.wait_for_timeout(1500)
-                            break
-                    except Exception:
-                        continue
-                if clicked:
-                    break
+            # ============ run 模式：两步签到 ============
+            # 第一步：点左侧 sidebar 的「签到」按钮，展开签到面板
+            left_signin_clicked = False
+            for btn in page.get_by_text("签到", exact=True).all():
+                try:
+                    box = btn.bounding_box()
+                    if box and box["y"] > 300:
+                        btn.click(timeout=3000, force=True)
+                        left_signin_clicked = True
+                        page.wait_for_timeout(2500)
+                        print(f"[库库AI] ✅ 左侧签到按钮已点击 (y={box['y']:.0f})")
+                        break
+                except Exception:
+                    continue
 
-            if clicked:
-                new_text = page.locator("body").inner_text(timeout=5000)
-                for text in SUCCESS_TEXT:
-                    if text in new_text:
-                        return _result("CLAIMED", "库库AI签到成功")
-                for text in ALREADY_TEXT:
-                    if text in new_text:
-                        return _result("ALREADY", "库库AI今天已签到")
-                return _result("CLAIMED", "库库AI签到已触发")
+            if not left_signin_clicked:
+                try:
+                    all_signin = page.locator("button").filter(has_text="签到").all()
+                    for btn in all_signin:
+                        try:
+                            if btn.is_visible() and btn.is_enabled():
+                                btn.click(timeout=3000, force=True)
+                                left_signin_clicked = True
+                                page.wait_for_timeout(2500)
+                                print("[库库AI] ✅ 兜底找到左侧签到按钮")
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
 
-            if action == "status":
-                return _result("DRY_RUN", "库库AI首页已加载，签到状态需人工确认")
+            if not left_signin_clicked:
+                return _result("UNKNOWN", "库库AI没找到左侧签到入口", 1)
 
-            return _result("UNKNOWN", "库库AI页面已加载但未找到签到入口", 1)
+            # 等待 iframe 加载（签到面板的内容在 iframe 里）
+            print("[库库AI] 等待签到 iframe 加载...")
+            sign_frame = None
+            try:
+                page.wait_for_selector("iframe.signin-center-iframe", timeout=12000)
+                # 进入 iframe
+                for frame in page.frames:
+                    if "kukuPcSignAct" in (frame.url or "") or "signin" in (frame.url or "").lower():
+                        sign_frame = frame
+                        print(f"  Found iframe: {frame.url}")
+                        break
+                if not sign_frame:
+                    sign_frame = page.frame(name="signin-center-iframe") or page.frames[1]
+                    print(f"  Using fallback frame: {sign_frame.url if sign_frame else 'None'}")
+            except Exception as exc:
+                return _result("BROWSER", f"签到弹窗加载失败: {exc}", 1)
+
+            # 在 iframe 里找 .pc-sign-btn
+            if not sign_frame:
+                return _result("UNKNOWN", "找不到签到 iframe", 1)
+
+            sign_btn = None
+            try:
+                sign_frame.wait_for_selector(".pc-sign-btn", timeout=10000)
+                sign_btn = sign_frame.locator(".pc-sign-btn").first
+            except Exception as exc:
+                return _result("UNKNOWN", f"iframe 里没找到 .pc-sign-btn: {exc}", 1)
+
+            btn_classes = sign_btn.get_attribute("class") or ""
+            btn_text = sign_btn.inner_text(timeout=2000)
+            print(f"  .pc-sign-btn text='{btn_text}' classes='{btn_classes}'")
+
+            if "is-signed" in btn_classes:
+                return _result("ALREADY", "库库AI今天已签到")
+
+            # status 模式：检测到未签到就返回，不真正点击
+            if is_status:
+                return _result("DRY_RUN", "库库AI今日可签到")
+
+            # 点击签到
+            print("[库库AI] 第二步：点击「立即签到」...")
+            try:
+                sign_btn.click(timeout=3000, force=True)
+                page.wait_for_timeout(3000)
+            except Exception as exc:
+                return _result("ERROR", f"点击签到失败: {exc}", 1)
+
+            # 验证：按钮变 is-signed → 成功
+            try:
+                sign_frame.wait_for_selector(".pc-sign-btn.is-signed", timeout=8000)
+                return _result("CLAIMED", "库库AI签到成功")
+            except Exception:
+                pass
+
+            # 兜底
+            new_text = page.locator("body").inner_text(timeout=5000)
+            for t in SUCCESS_TEXT:
+                if t in new_text:
+                    return _result("CLAIMED", "库库AI签到成功")
+            for t in ALREADY_TEXT:
+                if t in new_text:
+                    return _result("ALREADY", "库库AI今天已签到")
+
+            return _result("CLAIMED", "库库AI签到已触发")
 
         except Error as exc:
             return _result("BROWSER", f"库库AI页面操作失败: {type(exc).__name__}", 1)

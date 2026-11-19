@@ -122,23 +122,30 @@ def _decrypt_cookie_windows(blob, key, host):
 
 
 def _windows_profiles(root, preferred):
-    """候选配置目录：显式指定优先，其余按 Default、Profile N 自然顺序。"""
+    """候选配置目录：显式指定优先，其余按 Cookie 文件最近修改时间排序（最活跃的优先）。"""
     names = []
     for name in (preferred, "Default"):
         if name and name not in names:
             names.append(name)
     try:
-        children = sorted(path.name for path in root.iterdir() if path.is_dir())
+        all_dirs = [p for p in root.iterdir() if p.is_dir()]
     except OSError:
-        children = []
-    for name in children:
-        directory = root / name
-        if name in names:
+        all_dirs = []
+    # 按 Cookie 文件最近修改时间倒序（活跃 profile 优先）
+    dirs_with_cookies = []
+    for d in all_dirs:
+        if d.name in names:
             continue
-        if (directory / "Network/Cookies").is_file() or (
-            directory / "Cookies"
-        ).is_file():
-            names.append(name)
+        cookie_path = None
+        for c in (d / "Network/Cookies", d / "Cookies"):
+            if c.is_file():
+                cookie_path = c
+                break
+        if cookie_path:
+            dirs_with_cookies.append((d.name, cookie_path.stat().st_mtime))
+    dirs_with_cookies.sort(key=lambda x: x[1], reverse=True)
+    for name, _ in dirs_with_cookies:
+        names.append(name)
     return names
 
 

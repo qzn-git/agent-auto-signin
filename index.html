@@ -664,25 +664,36 @@
           var pillCls = 'pill ' + (!supported ? '' : (on ? 'pill-on' : 'pill-off'));
           var status = todayStatus[a.id];
           var isWebPlatform = (a.type === 'web');
-          // 需要"引导登录"按钮：只有网页端
-          var needsLogin = isWebPlatform && (status === 'NO_AUTH' || status === 'BROWSER' || status === 'NETWORK' || status === 'DRY_RUN');
+          // 需要"引导登录"按钮：只有网页端，且真的没有 Cookie（不是 DRY_RUN）
+          var needsLogin = isWebPlatform && (status === 'NO_AUTH' || status === 'BROWSER' || status === 'NETWORK');
           // 桌面端没装客户端的情况
           var needsDesktopSetup = !isWebPlatform && (status === 'NO_AUTH' || status === 'BROWSER');
+          // UNKNOWN = 脚本异常，需要引导登录
+          var needsUnknown = (status === 'UNKNOWN' || status === 'ERROR');
+          // DRY_RUN / UNSET = 今日可签到（有 Cookie、签到入口也找到了）
+          var canSign = (status === 'DRY_RUN' || status === 'UNSET' || (!status && !on));
           var btn;
           if (!supported) {
             btn = '<button type="button" disabled class="w-full cursor-not-allowed rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">后端未适配</button>';
           } else if (needsLogin) {
-            pillText = (status === 'BROWSER' ? '浏览器异常' : status === 'NETWORK' ? '网络异常' : status === 'DRY_RUN' ? '签到入口未找到' : '待登录');
+            pillText = (status === 'BROWSER' ? '浏览器异常' : status === 'NETWORK' ? '网络异常' : '待登录');
             pillCls = 'pill';
             btn = '<button type="button" data-action="login" data-id="' + a.id + '" class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90">🔐 重新引导登录</button>';
           } else if (needsDesktopSetup) {
             pillText = '待登录';
             pillCls = 'pill';
             btn = '<button type="button" disabled class="w-full cursor-not-allowed rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">⚠️ 请安装客户端登录</button>';
+          } else if (needsUnknown) {
+            pillText = '签到异常';
+            pillCls = 'pill';
+            btn = '<button type="button" data-action="login" data-id="' + a.id + '" class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90">🔐 引导登录重试</button>';
           } else if (on) {
             btn = '<button type="button" data-action="toggle" data-id="' + a.id + '" class="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-muted">今日已签到（重签）</button>';
-          } else {
+          } else if (canSign) {
             btn = '<button type="button" data-action="toggle" data-id="' + a.id + '" class="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">立即签到</button>';
+          } else {
+            // 有 status 但没 on：ALREADY/CLAIMED/VISITED 都算已签到
+            btn = '<button type="button" data-action="toggle" data-id="' + a.id + '" class="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-muted">今日已签到（重签）</button>';
           }
           return '' +
             '<article class="agent ' + a.cls + (on && supported ? ' is-checked' : '') + ' flex flex-col rounded-lg border p-4 shadow-sm">' +

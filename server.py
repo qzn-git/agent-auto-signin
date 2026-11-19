@@ -408,6 +408,93 @@ def api_history():
     return jsonify({"days": out, "backend_log_found": bool(history)})
 
 
+@app.route("/api/history-month")
+def api_history_month():
+    """返回指定月份的签到历史 + 月度统计。
+    参数: month=2026-11 (默认本月)
+    """
+    from datetime import timezone
+    bj = timezone(timedelta(hours=8))
+    try:
+        month = request.args.get("month", "")
+        if month:
+            year, mon = month.split("-")[:2]
+            year, mon = int(year), int(mon)
+        else:
+            now = datetime.now(bj)
+            year, mon = now.year, now.month
+    except (ValueError, AttributeError):
+        now = datetime.now(bj)
+        year, mon = now.year, now.month
+
+    month_prefix = f"{year:04d}-{mon:02d}"
+
+    # 读 daily.jsonl，过滤本月
+    daily_log = log_dir() / "daily.jsonl"
+    by_day = {}        # {"2026-11-19": [ {platform, result, report}, ... ]}
+    platform_ok = {}   # {"workbuddy": 3}
+    platform_bad = {}  # {"kuku": 3}
+    all_results = []   # 统计用
+
+    try:
+        with open(daily_log, "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except ValueError:
+                    continue
+                cycle = obj.get("cycle_utc8", "")
+                if not cycle.startswith(month_prefix):
+                    continue
+                be_id = obj.get("platform", "")
+                result = obj.get("result", "")
+                report = obj.get("report", "")
+                fe_id = BACKEND_TO_FRONTEND.get(be_id, be_id)
+
+                by_day.setdefault(cycle, []).append({
+                    "platform": fe_id,
+                    "backend_id": be_id,
+                    "result": result,
+                    "report": report[:120],
+                })
+
+                ok_res = ("CLAIMED", "ALREADY", "VISITED")
+                if result in ok_res:
+                    platform_ok[fe_id] = platform_ok.get(fe_id, 0) + 1
+                else:
+                    platform_bad[fe_id] = platform_bad.get(fe_id, 0) + 1
+                all_results.append(result)
+    except FileNotFoundError:
+        pass
+
+    # 按日期排序
+    sorted_days = {d: sorted(entries, key=lambda x: x["platform"])
+                   for d, entries in sorted(by_day.items())}
+
+    # 月度汇总
+    total_entries = sum(len(v) for v in sorted_days.values())
+    ok_count = sum(platform_ok.values())
+    bad_count = sum(platform_bad.values())
+    unique_days = len(sorted_days)
+
+    return jsonify({
+        "month": month_prefix,
+        "days_in_month": unique_days,
+        "total_records": total_entries,
+        "ok_count": ok_count,
+        "bad_count": bad_count,
+        "success_rate": round(ok_count / total_entries * 100, 1) if total_entries else 0,
+        "by_day": sorted_days,
+        "platforms": {
+            fe_id: {"ok": platform_ok.get(fe_id, 0), "bad": platform_bad.get(fe_id, 0)}
+            for fe_id in sorted(set(list(platform_ok.keys()) + list(platform_bad.keys())))
+        },
+    })
+
+
 @app.route("/api/sync-history", methods=["POST", "GET"])
 def api_sync_history():
     """强制扫描全平台今日签到状态，同步补写到 daily.jsonl。
