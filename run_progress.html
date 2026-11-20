@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>一键签到</title>
+<style>
+html,body{height:100%;margin:0;overflow:hidden}
+body{font-family:"Microsoft YaHei",Segoe UI,sans-serif;background:#fafafa;position:relative}
+.box{position:absolute;top:50%;left:50%;width:260px;margin:-50px 0 0 -130px;text-align:center}
+h2{color:#1f2937;margin:0 0 24px;font-size:16px;font-weight:600}
+.bar{width:220px;height:8px;background:#e5e7eb;border-radius:4px;margin:0 auto;overflow:hidden}
+.fill{height:100%;background:linear-gradient(90deg,#4f46e5,#7c3aed);width:0;border-radius:4px;transition:width .15s}
+.status{color:#9ca3af;margin-top:18px;font-size:13px}
+.ok{color:#16a34a;font-weight:600}.err{color:#dc2626}
+</style></head>
+<body onload="center()">
+<div class="box">
+<h2>🔔 一键签到</h2>
+<div class="bar"><div id="f" class="fill"></div></div>
+<div class="status" id="s">启动中...</div>
+</div>
+<script>
+function center(){
+  try{
+    var w=500,h=300;
+    window.resizeTo(w,h);
+    var sw=screen.width,sh=screen.height;
+    window.moveTo(Math.round((sw-w)/2), Math.round((sh-h)/2));
+  }catch(e){}
+  start();
+}
+function start(){
+  var bar=document.getElementById('f'), s=document.getElementById('s');
+  var t=0, itv=setInterval(function(){t+=7;if(t>90)t=90;bar.style.width=t+'%'},150);
+  var startMs=new Date().getTime();
+  function success(){
+    clearInterval(itv);bar.style.width='100%';
+    s.className='status ok';s.innerHTML='✅ 已就绪（手动关闭）';
+  }
+  function ping(){
+    if(new Date().getTime()-startMs>30000){
+      clearInterval(itv);
+      s.className='status err';s.innerHTML='❌ 启动超时';
+      return;
+    }
+    var done=false;
+    var img=new Image();
+    var to=setTimeout(function(){if(!done){ping();}},2500);
+    function ok(){if(done)return;done=true;clearTimeout(to);success();}
+    img.onload=ok;
+    img.onerror=ok;  // 端口通了就会触发（不管返回什么内容）
+    img.src='http://127.0.0.1:8765/api/platforms?t='+new Date().getTime();
+  }
+  ping();
+}
+</script></body></html>

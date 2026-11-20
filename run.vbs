@@ -1,20 +1,18 @@
-' ============================================
-'  agent-auto-signin silent launcher (no popup)
-'  Double-click to start Flask server on http://127.0.0.1:8765
-'  Run stop.bat to stop
-' ============================================
 Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 strDir = fso.GetParentFolderName(WScript.ScriptFullName)
+strPy  = strDir & "\.venv\Scripts\python.exe"
 
-' Kill stale old Flask processes first (python.exe and pythonw.exe)
+' 1. É±¾É½ø³Ì£¨Ö»É± venv ÏÂµÄ python.exe£©
 On Error Resume Next
-WshShell.Run "taskkill /F /IM python.exe /FI ""WINDOWTITLE eq agent-auto-signin*"" /T", 0, True
-WshShell.Run "taskkill /F /FI ""IMAGENAME eq pythonw.exe"" /FI ""MEMUSAGE gt 50000"" /T", 0, True
+WshShell.Run "wmic process where ""name='python.exe' and ExecutablePath like '%agent-auto-signin%"" call terminate", 0, True
 On Error GoTo 0
 
+' 2. ºóÌ¨ Flask
 WshShell.CurrentDirectory = strDir
-' Start Python server HIDDEN using pythonw.exe (no console, no window)
-WshShell.Run chr(34) & strDir & "\.venv\Scripts\pythonw.exe" & chr(34) & " server.py", 0, False
+WshShell.Run chr(34) & strPy & chr(34) & " -u -B server.py", 0, False
 
-' No WScript.Echo â€” silent start, no popup!
+' 3. ½ø¶ÈÌõ£¨HTML Àï×Ô¼º resizeTo Ëõµ½×îÐ¡£©
+WshShell.Run "mshta.exe """ & strDir & "\run_progress.html""", 1, False
+
+WScript.Quit

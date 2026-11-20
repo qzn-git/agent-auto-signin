@@ -14,7 +14,8 @@ import re
 import sqlite3
 import subprocess
 import sys
-from time import monotonic, time
+import time as _time_module
+from time import monotonic
 from urllib.parse import urlsplit
 
 ACTIVITY_URL = "https://www.doubao.com/pc/agent-explore"
@@ -149,12 +150,24 @@ def _windows_profiles(root, preferred):
     return names
 
 
-def _load_windows(profile, strict=False):
+def _kill_doubao_client():
+    """杀掉豆包客户端进程，释放 Cookie 文件锁。"""
+    try:
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "Doubao.exe"],
+            capture_output=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    _time_module.sleep(2)
+
+
+def _try_read_cookies():
+    """尝试一轮读取所有 profile 的 Cookie；成功返回 cookies，失败返回 None。"""
     from qoder_signin import QoderAuthError
 
     for root in _windows_roots():
-        names = (profile,) if strict else _windows_profiles(root, profile)
-        for name in names:
+        for name in _windows_profiles(root, "Default"):
             db = next(
                 (
                     path
@@ -183,6 +196,21 @@ def _load_windows(profile, strict=False):
             cookies = _cookies_for_key(rows, key, _decrypt_cookie_windows)
             if any(cookie["name"] in SESSION_NAMES for cookie in cookies):
                 return cookies
+    return None
+
+
+def _load_windows(profile, strict=False):
+    # 第一次尝试
+    cookies = _try_read_cookies()
+    if cookies is not None:
+        return cookies
+
+    # 全部失败 → 可能是豆包客户端锁了 Cookie 文件 → 杀进程再重试一次
+    _kill_doubao_client()
+    cookies = _try_read_cookies()
+    if cookies is not None:
+        return cookies
+
     raise SetupError(
         "无法读取豆包 Windows 登录态；请先登录，若 Cookie 库被占用，退出客户端后重试。v20 暂未支持"
     )
@@ -226,7 +254,7 @@ def load_cookies():
 
 def _cookies_for_key(rows, key, decrypt=None):
     cookies = []
-    now = time()
+    now = _time_module.time()
     for host, name, value, blob, path, secure, http_only, expires in rows:
         expiry = expires / 1_000_000 - 11644473600 if expires else -1
         if expires and expiry <= now:
@@ -356,15 +384,40 @@ def _client_ua():
     return CLIENT_UA
 
 
+# Playwright 持久 profile 目录（Cookie 自己存这里，自动续期）
+PROFILE_DIR = Path(os.environ.get("DOUBAO_PROFILE_DIR")
+                   or (Path.home() / ".agent-auto-signin" / "doubao-profile"))
+PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _persistent_has_doubao_cookies(context):
+    """检查 persistent profile 里有没有 doubao.com 的有效 sessionid Cookie。"""
+    try:
+        all_cookies = context.cookies(["https://www.doubao.com", "https://.doubao.com"])
+        return any(c["name"] in SESSION_NAMES and c["value"]
+                   for c in all_cookies)
+    except Exception:
+        return False
+
+
+def _new_persistent_context(playwright, headless=True):
+    kwargs = dict(
+        user_data_dir=str(PROFILE_DIR),
+        headless=headless,
+        locale="zh-CN",
+        user_agent=_client_ua(),
+    )
+    if headless:
+        kwargs["args"] = ["--headless=new", "--disable-gpu"]
+    return playwright.chromium.launch_persistent_context(**kwargs)
+
+
 def run(action):
     from playwright.sync_api import Error, sync_playwright
 
-    cookies = load_cookies()
     with sync_playwright() as playwright:
         try:
-            browser = playwright.chromium.launch(
-                headless=True, channel="chromium", timeout=15000
-            )
+            context = _new_persistent_context(playwright, headless=True)
         except Error:
             return _result(
                 "BROWSER",
@@ -373,9 +426,25 @@ def run(action):
             )
         try:
             if action == "doctor":
-                return _result("OK", "豆包桌面登录态可读取，Chromium 可启动")
-            context = browser.new_context(user_agent=_client_ua(), locale="zh-CN")
-            context.add_cookies(cookies)
+                # 尝试读一次客户端 Cookie（不杀进程），看看环境是否就绪
+                try:
+                    cookies = _try_read_cookies()
+                    if cookies is None:
+                        return _result(
+                            "DEPENDENCY",
+                            "豆包桌面登录态不可读；请确认已在桌面端登录",
+                            2,
+                        )
+                except Exception:
+                    pass
+                return _result("OK", "豆包环境就绪")
+
+            # 检查 persistent profile 里有没有有效 Cookie
+            if not _persistent_has_doubao_cookies(context):
+                # 首次 / Cookie 过期 → 读客户端（可能需要杀进程）
+                cookies = load_cookies()
+                context.add_cookies(cookies)
+
             page = context.new_page()
             response = page.goto(
                 ACTIVITY_URL, wait_until="domcontentloaded", timeout=25000
@@ -394,7 +463,7 @@ def run(action):
         except Error:
             return _result("BROWSER", "豆包活动页打开或交互失败，请在桌面端检查活动", 1)
         finally:
-            browser.close()
+            context.close()
 
 
 def main(action):

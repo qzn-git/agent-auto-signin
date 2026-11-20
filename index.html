@@ -168,8 +168,6 @@
       <nav class="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
         <a href="#overview" class="transition-colors hover:text-foreground">今日概览</a>
         <a href="#checkin" class="transition-colors hover:text-foreground">签到面板</a>
-        <a href="#calendar" class="transition-colors hover:text-foreground">签到日历</a>
-        <a href="#stats" class="transition-colors hover:text-foreground">统计排行</a>
       </nav>
       <div class="flex items-center gap-2">
         <span id="todayBadge" class="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground">--</span>
@@ -218,26 +216,11 @@
           </div>
         </div>
 
-        <div class="mt-10 grid grid-cols-2 gap-3 md:mt-12 md:grid-cols-4">
+        <div class="mt-10 grid grid-cols-1 gap-3 md:mt-12 md:grid-cols-1">
           <div class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs text-muted-foreground">今日已签到</p>
             <p class="mt-2 text-2xl font-semibold tabular-nums"><span id="kpiToday">0</span><span class="text-sm font-normal text-muted-foreground"> / <span id="kpiTodayTotal">--</span></span></p>
             <p id="kpiTodaySub" class="mt-1 text-xs text-muted-foreground">--</p>
-          </div>
-          <div class="rounded-lg border border-border bg-card p-4">
-            <p class="text-xs text-muted-foreground">本月完成率</p>
-            <p class="mt-2 text-2xl font-semibold tabular-nums"><span id="kpiRate">0</span><span class="text-sm font-normal text-muted-foreground"> %</span></p>
-            <p id="kpiRateSub" class="mt-1 text-xs text-muted-foreground">--</p>
-          </div>
-          <div class="rounded-lg border border-border bg-card p-4">
-            <p class="text-xs text-muted-foreground">最长连续</p>
-            <p class="mt-2 text-2xl font-semibold tabular-nums"><span id="kpiStreak">0</span><span class="text-sm font-normal text-muted-foreground"> 天</span></p>
-            <p id="kpiStreakSub" class="mt-1 text-xs text-muted-foreground">--</p>
-          </div>
-          <div class="rounded-lg border border-border bg-card p-4">
-            <p class="text-xs text-muted-foreground">累计签到</p>
-            <p class="mt-2 text-2xl font-semibold tabular-nums"><span id="kpiTotal">0</span><span class="text-sm font-normal text-muted-foreground"> 次</span></p>
-            <p id="kpiTotalSub" class="mt-1 text-xs text-muted-foreground">--</p>
           </div>
         </div>
       </div>
@@ -265,84 +248,18 @@
         <div id="agentGrid" class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
       </div>
     </section>
-
-    <section id="calendar" class="py-12 md:py-16">
-      <div class="container">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p class="text-sm font-medium text-accent-foreground">签到日历</p>
-            <h2 class="mt-2 text-[26px] font-semibold tracking-tight md:text-[32px]">整月签到密度</h2>
-          </div>
-          <div class="flex items-center gap-2">
-            <button id="calPrev" type="button" class="grid h-9 w-9 place-items-center rounded-md border border-border bg-card text-card-foreground transition-colors hover:bg-secondary" aria-label="上一个月">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            </button>
-            <span id="calTitle" class="min-w-[7.5rem] text-center text-sm font-medium tabular-nums">--</span>
-            <button id="calNext" type="button" class="grid h-9 w-9 place-items-center rounded-md border border-border bg-card text-card-foreground transition-colors hover:bg-secondary" aria-label="下一个月">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
-            </button>
-            <button id="calToday" type="button" class="rounded-md border border-border bg-card px-3 py-2 text-xs text-card-foreground transition-colors hover:bg-secondary">回到今天</button>
-          </div>
-        </div>
-
-        <div class="mt-6 grid gap-4 md:grid-cols-[1.45fr_1fr]">
-          <div class="rounded-lg border border-border bg-card p-4 md:p-5">
-            <div class="grid grid-cols-7 gap-1.5 pb-2 text-center text-xs text-muted-foreground">
-              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
-            </div>
-            <div id="calGrid" class="grid grid-cols-7 gap-1.5"></div>
-            <div class="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-              <span class="flex items-center gap-1.5">少 <span class="h-3 w-4 rounded-sm lvl0"></span><span class="h-3 w-4 rounded-sm lvl1"></span><span class="h-3 w-4 rounded-sm lvl2"></span><span class="h-3 w-4 rounded-sm lvl3"></span><span class="h-3 w-4 rounded-sm lvl4"></span> 多</span>
-              <span>颜色越深表示当天签到数量越多（0–9）</span>
-            </div>
-          </div>
-
-          <div class="rounded-lg border border-border bg-card p-4 md:p-5">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <p id="detailDate" class="text-sm font-medium">--</p>
-                <p id="detailSub" class="mt-1 text-xs text-muted-foreground">--</p>
-              </div>
-              <div id="detailActions" class="flex shrink-0 gap-2"></div>
-            </div>
-            <div id="detailBody" class="mt-4 space-y-4"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="stats" class="border-t border-border bg-muted py-12 md:py-16">
-      <div class="container">
-        <p class="text-sm font-medium text-accent-foreground">统计排行</p>
-        <h2 class="mt-2 text-[26px] font-semibold tracking-tight md:text-[32px]">最近 14 天与本月的节奏</h2>
-        <div class="mt-6 grid gap-4 md:grid-cols-2">
-          <div class="rounded-lg border border-border bg-card p-4 md:p-5">
-            <div class="flex items-center justify-between">
-              <p class="text-sm font-medium">最近 14 天签到数量</p>
-              <span id="barMaxLabel" class="text-xs text-muted-foreground">满格为 -- 个</span>
-            </div>
-            <div id="barChart" class="mt-5 flex items-end gap-1.5"></div>
-          </div>
-          <div class="rounded-lg border border-border bg-card p-4 md:p-5">
-            <div class="flex items-center justify-between">
-              <p class="text-sm font-medium">本月各助手签到次数</p>
-              <span id="rankSub" class="text-xs text-muted-foreground">--</span>
-            </div>
-            <div id="rankList" class="mt-4 space-y-3"></div>
-          </div>
-        </div>
-      </div>
-    </section>
   </main>
 
-  <footer class="border-t border-border py-8">
-    <div class="container flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+  <footer class="border-t border-border py-6">
+    <div class="container flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p class="text-xs leading-relaxed text-muted-foreground">
-        数据保存在当前浏览器 localStorage 中，清除浏览器数据会同时清除签到记录。首次打开会生成一组示例记录，可随时重置。
+        数据来源于用户本地，如有错误自行调试。
       </p>
-      <div class="flex flex-wrap gap-2">
-        <button id="btnSeed" type="button" class="rounded-md border border-border bg-card px-3 py-2 text-xs text-card-foreground transition-colors hover:bg-secondary">重置为示例数据</button>
-        <button id="btnClear" type="button" class="rounded-md border border-border bg-card px-3 py-2 text-xs text-card-foreground transition-colors hover:bg-secondary">清空所有记录</button>
+      <div class="flex items-center gap-3 text-xs text-muted-foreground">
+        <span id="serverInfo">服务检测中...</span>
+        <button id="shutdownBtn" type="button" class="hidden rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-red-300 hover:text-red-500" title="关闭本地 Flask 服务">
+          关闭服务
+        </button>
       </div>
     </div>
   </footer>
@@ -361,7 +278,6 @@
         { id: 'miaoda', name: '秒哒', short: '秒', cls: 'a-miaoda', desc: '无代码应用生成', type: 'web' },
         { id: 'dazi', name: '百度搭子', short: '搭', cls: 'a-dazi', desc: '智能体协作伙伴', type: 'desktop' },
         { id: 'kuku', name: '库库AI', short: '库', cls: 'a-kuku', desc: 'AI 创作助手', type: 'web' },
-        { id: 'qianwen-office', name: '千问办公', short: '办', cls: 'a-qianwen-office', desc: '办公协作助手', type: 'web' },
         { id: 'qoder-cn', name: 'Qoder 国内', short: 'Q', cls: 'a-qoder-cn', desc: 'AI 编程工具（国内版）', type: 'desktop' },
         { id: 'workbuddy', name: 'workbuddy', short: 'W', cls: 'a-wb', desc: '办公效率助手', type: 'desktop' }
       ];
@@ -392,29 +308,12 @@
         heroEyebrow: document.getElementById('heroEyebrow'),
         heroTitle: document.getElementById('heroTitle'),
         heroSummary: document.getElementById('heroSummary'),
-        heroTip: document.getElementById('heroTip'),
-        heroDots: document.getElementById('heroDots'),
         ring: document.getElementById('ringProgress'),
         ringValue: document.getElementById('ringValue'),
         kpiToday: document.getElementById('kpiToday'),
         kpiTodaySub: document.getElementById('kpiTodaySub'),
-        kpiRate: document.getElementById('kpiRate'),
-        kpiRateSub: document.getElementById('kpiRateSub'),
-        kpiStreak: document.getElementById('kpiStreak'),
-        kpiStreakSub: document.getElementById('kpiStreakSub'),
-        kpiTotal: document.getElementById('kpiTotal'),
-        kpiTotalSub: document.getElementById('kpiTotalSub'),
         agentGrid: document.getElementById('agentGrid'),
-        searchInput: document.getElementById('searchInput'),
-        calTitle: document.getElementById('calTitle'),
-        calGrid: document.getElementById('calGrid'),
-        detailDate: document.getElementById('detailDate'),
-        detailSub: document.getElementById('detailSub'),
-        detailBody: document.getElementById('detailBody'),
-        detailActions: document.getElementById('detailActions'),
-        barChart: document.getElementById('barChart'),
-        rankList: document.getElementById('rankList'),
-        rankSub: document.getElementById('rankSub')
+        searchInput: document.getElementById('searchInput')
       };
 
       /* ---------- 日期工具 ---------- */
@@ -471,18 +370,14 @@
           // 3. 今日实时状态（API 可能慢，忽略失败）
           try {
             var statResp = await apiGet('/api/status');
-            var todayList = [];
             todayStatus = {};
             statResp.platforms.forEach(function (p) {
               if (p.frontend_id) {
                 todayStatus[p.frontend_id] = p.status;
-                if (p.status === 'CLAIMED' || p.status === 'ALREADY' || p.status === 'VISITED') {
-                  todayList.push(p.frontend_id);
-                }
               }
             });
-            if (todayList.length) state.days[TODAY] = todayList;
-          } catch (e) { /* 超时忽略，已有 history 兜底 */ }
+            // 不覆盖 history 里的今日记录 —— renderAgents 会优先用 todayStatus
+          } catch (e) { /* 超时忽略 */ }
 
           // 同步 KPI 里的"总平台数"为后端实际支持数
           var supportedCount = Object.values(platformMeta).filter(function (m) { return m.supported; }).length;
@@ -543,7 +438,8 @@
       }
 
       function computeStats() {
-        var signedToday = countOn(TODAY);
+        // 今日签到数：优先用实时 status API
+        var signedToday = AGENTS.filter(function (a) { return isTodaySigned(a.id); }).length;
         var elapsed = today.getDate();
         var monthSigned = 0;
         for (var d = 1; d <= elapsed; d++) {
@@ -600,34 +496,30 @@
         }
         var kpiTodayTotalEl = document.getElementById('kpiTodayTotal');
         if (kpiTodayTotalEl) kpiTodayTotalEl.textContent = TOTAL;
-        var barMaxLabelEl = document.getElementById('barMaxLabel');
-        if (barMaxLabelEl) barMaxLabelEl.textContent = '满格为 ' + TOTAL + ' 个';
-        el.heroTip.textContent = rest === 0 ? '今日完成率 100%，可以放心收工。' : '完成率 ' + Math.round((st.signedToday / TOTAL) * 100) + '%，点一下卡片即可签到。';
 
         var c = 2 * Math.PI * 52;
         el.ring.setAttribute('stroke-dasharray', c.toFixed(1));
         el.ring.setAttribute('stroke-dashoffset', (c * (1 - st.signedToday / TOTAL)).toFixed(1));
         el.ringValue.textContent = st.signedToday + '/' + TOTAL;
 
-        el.heroDots.innerHTML = AGENTS.map(function (a) {
-          var on = hasCheck(a.id, TODAY);
-          return '<div class="hero-dot ' + a.cls + (on ? ' on' : '') + '" title="' + a.name + (on ? '：今日已签到' : '：今日未签到') + '">' + a.name + '</div>';
-        }).join('');
-
         el.kpiToday.textContent = String(st.signedToday);
         el.kpiTodaySub.textContent = rest === 0 ? '今日已全部完成' : '还差 ' + rest + ' 个助手';
-        el.kpiRate.textContent = String(st.rate);
-        el.kpiRateSub.textContent = '本月已签 ' + st.monthSigned + ' 次 / ' + (st.elapsed * TOTAL) + ' 次';
-        el.kpiStreak.textContent = String(st.best.n);
-        el.kpiStreakSub.textContent = st.best.id ? MAP[st.best.id].name + ' 的连续记录' : '暂无连续记录';
-        el.kpiTotal.textContent = String(st.cumulative);
-        el.kpiTotalSub.textContent = '覆盖 ' + Object.keys(state.days).length + ' 天';
+      }
+
+      function isTodaySigned(frontendId) {
+        // 优先用实时 status API 的结果（ALREADY/CLAIMED/VISITED = 今日已签到）
+        var st = todayStatus[frontendId];
+        if (st === 'ALREADY' || st === 'CLAIMED' || st === 'VISITED') return true;
+        if (st === 'NO_AUTH' || st === 'BROWSER' || st === 'NETWORK' || st === 'UNKNOWN' || st === 'ERROR') return false;
+        // status 没有（null/DRY_RUN）时，回退到 history 里的今日记录
+        return checkedIds(TODAY).indexOf(frontendId) !== -1;
       }
 
       function renderAgents() {
-        var signedToday = checkedIds(TODAY);
+        var signedToday = AGENTS.filter(function (a) { return isTodaySigned(a.id); });
+        var signedIds = signedToday.map(function (a) { return a.id; });
         var shown = AGENTS.filter(function (a) {
-          var on = signedToday.indexOf(a.id) !== -1;
+          var on = signedIds.indexOf(a.id) !== -1;
           if (filter === 'on' && !on) return false;
           if (filter === 'off' && on) return false;
           if (term && a.name.toLowerCase().indexOf(term.toLowerCase()) === -1) return false;
@@ -649,17 +541,8 @@
         }
 
         el.agentGrid.innerHTML = shown.map(function (a) {
-          var on = signedToday.indexOf(a.id) !== -1;
+          var on = isTodaySigned(a.id);
           var supported = !platformMeta[a.id] || platformMeta[a.id].supported;
-          var streak = streakOf(a.id);
-          var mc = monthCountOf(a.id);
-          var minis = '';
-          for (var i = 13; i >= 0; i--) {
-            var d = addDays(today, -i);
-            var k = dstr(d);
-            var hit = hasCheck(a.id, k);
-            minis += '<span class="mini-day' + (hit ? ' on' : '') + '" title="' + (d.getMonth() + 1) + '月' + d.getDate() + '日' + (hit ? ' 已签到' : ' 未签到') + '"></span>';
-          }
           var pillText = supported ? (on ? '已签到' : '未签到') : '未适配';
           var pillCls = 'pill ' + (!supported ? '' : (on ? 'pill-on' : 'pill-off'));
           var status = todayStatus[a.id];
@@ -705,11 +588,6 @@
                 '</div>' +
                 '<span class="' + pillCls + '">' + pillText + '</span>' +
               '</div>' +
-              '<div class="mt-3 flex items-center justify-between text-xs text-muted-foreground">' +
-                '<span>连续 <b class="font-semibold tabular-nums text-foreground">' + streak + '</b> 天</span>' +
-                '<span>本月 <b class="font-semibold tabular-nums text-foreground">' + mc + '</b> 次</span>' +
-              '</div>' +
-              '<div class="mini-days mt-3">' + minis + '</div>' +
               '<div class="mt-4">' + btn + '</div>' +
             '</article>';
         }).join('');
@@ -751,9 +629,6 @@
           el.detailActions.innerHTML = '';
         } else {
           var acts = '';
-          if (ids.length < TOTAL) {
-            acts += '<button type="button" data-action="fill-date" class="rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90">全部补签</button>';
-          }
           if (ids.length > 0) {
             acts += '<button type="button" data-action="clear-date" class="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary">清空这天</button>';
           }
@@ -762,7 +637,7 @@
 
         var body = '';
         if (!ids.length) {
-          body += '<p class="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">这一天没有签到记录' + (future ? '' : '，可用「全部补签」一次性补齐。') + '</p>';
+          body += '<p class="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">这一天没有签到记录</p>';
         } else {
           body += '<div><p class="text-xs text-muted-foreground">已签到</p><ul class="mt-2 space-y-1.5">' +
             ids.map(function (id) {
@@ -823,10 +698,6 @@
         renderHeader();
         renderOverview();
         renderAgents();
-        renderCalendar();
-        renderDetail();
-        renderBars();
-        renderRank();
       }
 
       /* ---------- 交互（调后端真实签到） ---------- */
@@ -967,52 +838,34 @@
         renderAgents();
       });
 
-      el.calGrid.addEventListener('click', function (e) {
-        var cell = e.target.closest('[data-date]');
-        if (!cell) return;
-        selectedDate = cell.getAttribute('data-date');
-        renderCalendar();
-        renderDetail();
-      });
+      /* ---------- 初始化 ---------- */
 
-      el.detailActions.addEventListener('click', function (e) {
-        var btn = e.target.closest('[data-action]');
-        if (!btn) return;
-        var action = btn.getAttribute('data-action');
-        if (action === 'fill-date') {
-          state.days[selectedDate] = AGENTS.map(function (a) { return a.id; });
-        } else if (action === 'clear-date') {
-          delete state.days[selectedDate];
+      // 服务状态检测 + 关闭按钮
+      (function checkServerInfo() {
+        var infoEl = document.getElementById('serverInfo');
+        var btn = document.getElementById('shutdownBtn');
+        apiGet('/api/info').then(function (info) {
+          if (infoEl) infoEl.innerHTML = '🟢 服务运行中（PID ' + info.pid + '，已运行 ' + info.uptime_human + '）';
+          if (btn) btn.classList.remove('hidden');
+        }).catch(function () {
+          if (infoEl) infoEl.innerHTML = '🔴 服务未连接';
+        });
+
+        if (btn) {
+          btn.addEventListener('click', function () {
+            if (!confirm('确定关闭本地签到服务吗？\n\n关闭后前端页面将无法使用，需要手动双击 run.vbs 重新启动。')) return;
+            btn.disabled = true;
+            btn.textContent = '关闭中...';
+            apiGet('/api/shutdown').then(function () {
+              infoEl.innerHTML = '🔴 服务已关闭（5秒后本页自动刷新）';
+              setTimeout(function () { location.reload(); }, 5000);
+            }).catch(function () {
+              // Flask 可能已经真的关了
+              infoEl.innerHTML = '🔴 服务已关闭';
+            });
+          });
         }
-        saveState();
-        renderAll();
-      });
-
-      document.getElementById('calPrev').addEventListener('click', function () {
-        calMonth--;
-        if (calMonth < 0) { calMonth = 11; calYear--; }
-        renderCalendar();
-      });
-      document.getElementById('calNext').addEventListener('click', function () {
-        calMonth++;
-        if (calMonth > 11) { calMonth = 0; calYear++; }
-        renderCalendar();
-      });
-      document.getElementById('calToday').addEventListener('click', function () {
-        calYear = today.getFullYear();
-        calMonth = today.getMonth();
-        selectedDate = TODAY;
-        renderCalendar();
-        renderDetail();
-      });
-
-      document.getElementById('btnSeed').addEventListener('click', function () {
-        alert('已接入后端 API，不再使用示例数据。请到浏览器控制台访问后端接口。');
-      });
-
-      document.getElementById('btnClear').addEventListener('click', function () {
-        alert('已接入后端 API，历史记录由后端日志维护，无法在前端清空。');
-      });
+      })();
 
       // 启动：异步拉取后端数据
       initData();

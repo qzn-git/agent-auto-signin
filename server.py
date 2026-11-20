@@ -560,21 +560,66 @@ def api_sync_history():
                     "synced_count": len(synced)})
 
 
+# ---------- 服务控制 ----------
+
+_START_TIME = datetime.now()
+
+
+@app.route("/api/info")
+def api_info():
+    """返回服务自身信息（PID、启动时间）。"""
+    uptime = (datetime.now() - _START_TIME).total_seconds()
+    return jsonify({
+        "pid": os.getpid(),
+        "started_at": _START_TIME.strftime("%Y-%m-%d %H:%M:%S"),
+        "uptime_seconds": round(uptime),
+        "uptime_human": _format_uptime(uptime),
+    })
+
+
+@app.route("/api/shutdown", methods=["POST", "GET"])
+def api_shutdown():
+    """关闭 Flask 服务（前端按钮调用）。"""
+    _shutdown_executor()
+
+    # 给前端一点时间收响应，再杀进程
+    threading.Timer(0.5, lambda: os._exit(0)).start()
+    return jsonify({"ok": True, "message": "服务即将关闭"})
+
+
+def _format_uptime(seconds):
+    if seconds < 60:
+        return f"{int(seconds)}秒"
+    minutes = int(seconds // 60)
+    if minutes < 60:
+        return f"{minutes}分{int(seconds % 60)}秒"
+    hours = minutes // 60
+    return f"{hours}小时{minutes % 60}分"
+
+
 # ---------- 前端静态文件 ----------
 
 # 前端 index.html 位置（独立于本项目，可通过环境变量覆盖）
 WEB_ROOT = Path(os.environ.get("WEB_ROOT")
-                or (Path.home() / "Desktop" / "独立开发" / "一键签到"))
+                or Path(__file__).resolve().parent)
 
 @app.route("/")
 def serve_index():
-    return send_from_directory(str(WEB_ROOT), "index.html")
+    resp = send_from_directory(str(WEB_ROOT), "index.html")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.route("/<path:path>")
 def serve_static(path):
     target = WEB_ROOT / path
     if target.is_file():
-        return send_from_directory(str(WEB_ROOT), path)
+        resp = send_from_directory(str(WEB_ROOT), path)
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
     return jsonify({"error": "not found"}), 404
 
 

@@ -14,6 +14,7 @@ _debug_*.png
 _diag_*.py
 _login_*.py
 _open_*.py
+_*.ps1
 # runtime data
 daily.jsonl
 daily.jsonl.*
